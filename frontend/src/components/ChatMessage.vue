@@ -7,8 +7,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-defineProps<{ role: 'user' | 'assistant' | 'system', content: string }>()
-
 const props = defineProps<{ role: 'user' | 'assistant' | 'system', content: string }>()
 const rendered = computed(() =>
   props.content
