@@ -28,9 +28,14 @@ async def run(sql: str, dry_run: bool = True) -> QueryResult:
     if dry_run:
         job_config.dry_run = True
         job = client.query(sql, job_config=job_config)
+        total_bytes = getattr(job, "total_bytes_processed", 0) or 0
+        tb = total_bytes / float(1024 ** 4)
+        cost = tb * float(settings.price_per_tb_usd)
         meta = {
             "dry_run": True,
-            "total_bytes_processed": getattr(job, "total_bytes_processed", None),
+            "total_bytes_processed": total_bytes,
+            "estimated_tb": round(tb, 6),
+            "estimated_cost_usd": round(cost, 6),
             "cache_hit": getattr(job, "cache_hit", None),
             "job_id": getattr(job, "job_id", None),
             "location": getattr(job, "location", None),

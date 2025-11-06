@@ -1,0 +1,15 @@
+# Golden queries v0 (examples)
+queries:
+  - nl: "지난 7일 주문 추이"
+    intent: metric_over_time
+    slots: { metric: orders, time_window: { days: 7 } }
+  - nl: "최근 7일 매출 추이"
+    intent: metric_over_time
+    slots: { metric: gmv, time_window: { days: 7 } }
+  - nl: "일별 주문수"
+    intent: metric_over_time
+    slots: { metric: orders }
+  - nl: "매출과 AOV"
+    intent: metric
+    slots: { metric: gmv }
+

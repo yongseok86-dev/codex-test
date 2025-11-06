@@ -1,0 +1,11 @@
+{
+  "deny_contains": [
+    " delete ",
+    " update ",
+    " insert ",
+    " drop ",
+    " truncate ",
+    " select * "
+  ]
+}
+

@@ -50,3 +50,8 @@ BigQuery 실제 실행 시에는 GCP 인증이 필요합니다.
 - 또는 런타임 환경(Cloud Run 등)에 기본 인증 제공
 
 프런트엔드는 추후 `frontend/` 디렉터리에 Vue3 기반으로 추가할 예정입니다.
+
+## Streaming API (SSE)
+- 엔드포인트: `GET /api/query/stream?q=...&limit=...&dry_run=...`
+- 이벤트 흐름: `nlu` → `plan` → `sql` → `validated` → `result`
+- 프런트엔드는 기본적으로 스트리밍 모드가 활성화되어 단계별 진행 상황을 표시합니다.

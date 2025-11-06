@@ -2,6 +2,7 @@
   <div class="chat">
     <div class="toolbar">
       <el-switch v-model="dryRun" active-text="Dry Run" inactive-text="Execute" />
+      <el-switch v-model="streaming" active-text="Streaming" />
       <el-input-number v-model="limit" :min="1" :max="5000" :step="50" size="small" />
       <el-button size="small" @click="clear">지우기</el-button>
     </div>
@@ -32,6 +33,7 @@ const scrollEl = ref<HTMLElement | null>(null)
 const dryRun = ref(true)
 const limit = ref(100)
 const lastResult = computed(() => current.value.lastResult)
+const streaming = ref(true)
 
 function scrollToBottom() {
   nextTick(() => {
@@ -46,15 +48,49 @@ async function onSend(text: string) {
   scrollToBottom()
   try {
     const base = (import.meta as any).env?.VITE_API_BASE || ''
-    const r = await fetch(`${base}/api/query`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: text, dry_run: dryRun.value, limit: limit.value })
-    })
-    if (!r.ok) throw new Error(await r.text())
-    const body = await r.json()
-    addMessage('assistant', 'SQL이 생성되었습니다. 아래 결과 패널을 확인하세요.')
-    setResult(body)
+    if (streaming.value) {
+      const url = new URL(`${base}/api/query/stream`, window.location.origin)
+      url.searchParams.set('q', text)
+      url.searchParams.set('limit', String(limit.value))
+      url.searchParams.set('dry_run', String(dryRun.value))
+      const es = new EventSource(url.toString())
+      es.addEventListener('nlu', (ev: MessageEvent) => {
+        const data = JSON.parse(ev.data)
+        addMessage('assistant', `NLU 의도: ${data.intent}`)
+      })
+      es.addEventListener('plan', (ev: MessageEvent) => {
+        addMessage('assistant', '플랜 생성 완료')
+      })
+      es.addEventListener('sql', (ev: MessageEvent) => {
+        const data = JSON.parse(ev.data)
+        addMessage('assistant', 'SQL 생성 완료')
+      })
+      es.addEventListener('validated', (ev: MessageEvent) => {
+        const data = JSON.parse(ev.data)
+        if (!data.ok) addMessage('assistant', `검증 실패: ${data.error}`)
+        else addMessage('assistant', '검증 통과')
+      })
+      es.addEventListener('result', (ev: MessageEvent) => {
+        const data = JSON.parse(ev.data)
+        setResult(data)
+        addMessage('assistant', '실행 완료')
+        es.close()
+      })
+      es.addEventListener('error', (ev: MessageEvent) => {
+        try { addMessage('assistant', `오류: ${JSON.parse((ev as any).data).message}`) } catch {}
+        es.close()
+      })
+    } else {
+      const r = await fetch(`${base}/api/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: text, dry_run: dryRun.value, limit: limit.value })
+      })
+      if (!r.ok) throw new Error(await r.text())
+      const body = await r.json()
+      addMessage('assistant', 'SQL이 생성되었습니다. 아래 결과 패널을 확인하세요.')
+      setResult(body)
+    }
   } catch (e: any) {
     addMessage('assistant', `오류: ${e?.message || e}`)
   } finally {

@@ -1,15 +1,42 @@
 # Placeholder semantic model (draft)
 entities:
+  - name: customer
+    grain: customer_id
+    table: `project.dataset.customers`
+    dimensions:
+      - name: customer_id
+      - name: join_date
+        type: date
+      - name: channel
+        synonyms: [채널]
   - name: order
     grain: order_id
     table: `project.dataset.orders`
+    relationships:
+      - to: customer
+        type: many_to_one
+        on: order.customer_id = customer.customer_id
     dimensions:
       - name: order_date
         type: date
-      - name: channel
+      - name: status
+        valid_values: [completed, cancelled, returned]
     measures:
       - name: orders
         expr: COUNT(DISTINCT order_id)
       - name: gmv
         expr: SUM(net_amount)
 
+metrics:
+  - name: gmv
+    expr: SUM(order.net_amount)
+    default_filters: [order.status='completed']
+  - name: aov
+    expr: gmv / NULLIF(COUNT(DISTINCT order_id),0)
+
+vocabulary:
+  synonyms:
+    '구매': ['주문','order']
+    '매출': ['GMV','거래액']
+  units:
+    currency: KRW
