@@ -230,3 +230,67 @@ sequenceDiagram
 
     note over API: LLM 실패 시 경고 로그 기록, 규칙 기반으로 폴백
 ```
+## Architecture Overview
+
+```mermaid
+flowchart LR
+  subgraph Client
+    FE[Vue3 Frontend\nChatView + Components]
+  end
+
+  subgraph API[FastAPI Backend]
+    R[Routers\n/healthz,/readyz,/api/query,/api/query/stream]
+    S[Services]
+    S_NLU[NLU]
+    S_PL[Planner]
+    S_PMT[Prompt]
+    S_LLM[LLM Client]
+    S_SG[SQLGen]
+    S_VAL[Guardrails]
+    S_PIPE[Validation Pipeline]
+    S_EXE[Executor]
+    BQCON[BQ Connector]
+  end
+
+  subgraph SEM[Semantic Layer]
+    SEM_YML[semantic.yml]
+    SEM_MET[metrics_definitions.yaml]
+    SEM_GQ[golden_queries.yaml]
+    SEM_DS[datasets.yaml]
+  end
+
+  subgraph GCP[BigQuery]
+    BQ[(Project\nDatasets\nTables)]
+  end
+
+  subgraph LLM[Providers]
+    OAI[OpenAI]
+    CLAUDE[Claude]
+    GEM[Gemini]
+  end
+
+  FE -->|REST/SSE| R
+  R --> S_NLU
+  S_NLU --> S_PL
+  S_PL --> S_PMT
+  S_PMT --> S_LLM
+  S_PL --> S_SG
+  S_LLM -->|SQL or error| R
+  S_SG -->|SQL| R
+  R --> S_VAL
+  R --> S_PIPE
+  S_PIPE --> BQCON --> BQ
+  R --> S_EXE --> BQ
+
+  S_PMT -.reads .-> SEM_YML
+  S_PMT -.reads .-> SEM_MET
+  S_PMT -.reads .-> SEM_GQ
+  S_PMT -.overrides .-> SEM_DS
+
+  R -.LLM keys/tuning .-> S_LLM
+  S_LLM --> OAI
+  S_LLM --> CLAUDE
+  S_LLM --> GEM
+
+  R -->|Response JSON| FE
+```
