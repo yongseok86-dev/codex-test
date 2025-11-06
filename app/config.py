@@ -9,9 +9,13 @@ class Settings(BaseSettings):
     dry_run_only: bool = True  # scaffold default
     price_per_tb_usd: float = 5.0
     # LLM settings
-    llm_provider: str | None = None  # e.g., "openai"
+    llm_provider: str | None = "openai"  # "openai" | "gemini" | "claude"
     openai_api_key: str | None = None
     openai_model: str | None = None
+    anthropic_api_key: str | None = None
+    anthropic_model: str | None = None
+    gemini_api_key: str | None = None
+    gemini_model: str | None = None
 
     class Config:
         env_file = ".env"

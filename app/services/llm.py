@@ -10,6 +10,16 @@ try:
 except Exception:
     OpenAI = None  # type: ignore
 
+try:
+    import anthropic  # type: ignore
+except Exception:  # pragma: no cover
+    anthropic = None  # type: ignore
+
+try:
+    import google.generativeai as genai  # type: ignore
+except Exception:  # pragma: no cover
+    genai = None  # type: ignore
+
 
 class LLMNotConfigured(Exception):
     pass
@@ -36,6 +46,36 @@ def generate_sql_via_llm(question: str) -> str:
         content = resp.choices[0].message.content or ""
         return _extract_sql_from_text(content)
 
+    if provider in {"claude", "anthropic"}:
+        if anthropic is None or not settings.anthropic_api_key:
+            raise LLMNotConfigured("Anthropic provider not available or missing API key")
+        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        model = settings.anthropic_model or "claude-3-5-sonnet-20240620"
+        resp = client.messages.create(
+            model=model,
+            max_tokens=1024,
+            temperature=0.1,
+            system="You generate only SQL in code fences.",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        # content is a list of content blocks; take text
+        text_parts = []
+        for block in getattr(resp, "content", []) or []:
+            if getattr(block, "type", "") == "text":
+                text_parts.append(getattr(block, "text", ""))
+        content = "\n".join(text_parts) or str(resp)
+        return _extract_sql_from_text(content)
+
+    if provider in {"gemini", "google", "gcp"}:
+        if genai is None or not settings.gemini_api_key:
+            raise LLMNotConfigured("Gemini provider not available or missing API key")
+        genai.configure(api_key=settings.gemini_api_key)
+        model = settings.gemini_model or "gemini-1.5-flash"
+        m = genai.GenerativeModel(model)
+        resp = m.generate_content(prompt)
+        content = getattr(resp, "text", None) or "\n".join(getattr(resp, "candidates", []) or [])
+        return _extract_sql_from_text(content)
+
     # More providers can be added here (Vertex AI, Azure OpenAI)
     raise LLMNotConfigured("No LLM provider configured")
 
@@ -49,4 +89,3 @@ def _extract_sql_from_text(text: str) -> str:
     if end == -1:
         end = len(text)
     return text[start:end].strip()
-
