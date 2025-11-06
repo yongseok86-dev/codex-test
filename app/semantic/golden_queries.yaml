@@ -1,15 +1,32 @@
 # Golden queries v0 (examples)
 queries:
-  - nl: "지난 7일 주문 추이"
+  - nl: "지난 7일 Mall 유입 고객 세션 수 추이"
     intent: metric_over_time
-    slots: { metric: orders, time_window: { days: 7 } }
-  - nl: "최근 7일 매출 추이"
-    intent: metric_over_time
-    slots: { metric: gmv, time_window: { days: 7 } }
-  - nl: "일별 주문수"
-    intent: metric_over_time
-    slots: { metric: orders }
-  - nl: "매출과 AOV"
+    slots: { metric: sessions, time_window: { days: 7 }, grain: day }
+  - nl: "채널별 구매 전환율"
     intent: metric
-    slots: { metric: gmv }
-
+    slots: { metric: conversion_rate, group_by: [session.source_medium] }
+  - nl: "랜딩 페이지 Top 10 (세션 기준)"
+    intent: metric
+    slots: { metric: sessions, group_by: [session.landing_page], order_by: desc, limit: 10 }
+  - nl: "디바이스별 이탈률"
+    intent: metric
+    slots: { metric: bounce_rate, group_by: [session.device_category] }
+  - nl: "캠페인별 신규 고객 수"
+    intent: metric
+    slots: { metric: users, filters: [user.is_new_user = true], group_by: [session.campaign] }
+  - nl: "요일/시간대별 세션 분포"
+    intent: metric
+    slots: { metric: sessions, group_by: [extract_dow(session.session_date), extract_hour(session.session_date)] }
+  - nl: "장바구니 추가 수 추이 (최근 14일)"
+    intent: metric_over_time
+    slots: { metric: add_to_cart, time_window: { days: 14 }, grain: day }
+  - nl: "상품별 매출 Top 20"
+    intent: metric
+    slots: { metric: gmv, group_by: [event.item_id], order_by: desc, limit: 20 }
+  - nl: "Mall 유입 첫 방문 이후 7일 내 구매 전환율"
+    intent: metric
+    slots: { metric: conversion_rate, filters: [user.is_new_user = true, datediff(order.order_date, user.first_touch_date) <= 7] }
+  - nl: "주차별 주문수"
+    intent: metric_over_time
+    slots: { metric: orders, grain: week }

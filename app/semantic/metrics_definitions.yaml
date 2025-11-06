@@ -1,8 +1,33 @@
 metrics:
+  - name: sessions
+    description: Number of sessions
+    expr: COUNT(DISTINCT session.session_id)
+  - name: users
+    description: Number of unique users
+    expr: COUNT(DISTINCT user.user_pseudo_id)
+  - name: events
+    description: Number of events
+    expr: COUNT(*)
   - name: gmv
     description: Gross Merchandise Value (completed orders)
-    expr: SUM(net_amount)
+    expr: SUM(order.net_amount)
+    default_filters:
+      - order.status = 'completed'
   - name: orders
-    description: Count of distinct orders
-    expr: COUNT(DISTINCT order_id)
-
+    description: Count of distinct completed orders
+    expr: COUNT(DISTINCT order.order_id)
+    default_filters:
+      - order.status = 'completed'
+  - name: conversion_rate
+    description: Orders / Sessions
+    expr: SAFE_DIVIDE(COUNT(DISTINCT order.order_id), COUNT(DISTINCT session.session_id))
+    default_filters:
+      - order.status = 'completed'
+  - name: aov
+    description: Average order value
+    expr: SAFE_DIVIDE(SUM(order.net_amount), NULLIF(COUNT(DISTINCT order.order_id),0))
+    default_filters:
+      - order.status = 'completed'
+  - name: bounce_rate
+    description: Bounce / Sessions
+    expr: SAFE_DIVIDE(SUM(CASE WHEN session.is_bounce THEN 1 ELSE 0 END), COUNT(DISTINCT session.session_id))

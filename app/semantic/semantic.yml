@@ -1,42 +1,122 @@
 # Placeholder semantic model (draft)
 entities:
-  - name: customer
-    grain: customer_id
-    table: `project.dataset.customers`
+  - name: user
+    grain: user_pseudo_id
+    table: `proj.mall.users`
     dimensions:
-      - name: customer_id
-      - name: join_date
+      - name: user_pseudo_id
+      - name: first_touch_date
         type: date
-      - name: channel
-        synonyms: [채널]
+      - name: first_channel
+        synonyms: [유입채널, 채널]
+      - name: is_new_user
+        type: boolean
+
+  - name: session
+    grain: session_id
+    table: `proj.mall.sessions`
+    relationships:
+      - to: user
+        type: many_to_one
+        on: session.user_pseudo_id = user.user_pseudo_id
+    dimensions:
+      - name: session_id
+      - name: session_date
+        type: date
+      - name: source_medium
+      - name: campaign
+      - name: device_category
+      - name: landing_page
+      - name: is_bounce
+        type: boolean
+    measures:
+      - name: sessions
+        expr: COUNT(DISTINCT session_id)
+      - name: bounces
+        expr: SUM(CASE WHEN is_bounce THEN 1 ELSE 0 END)
+
+  - name: event
+    grain: event_id
+    table: `proj.mall.events`
+    relationships:
+      - to: session
+        type: many_to_one
+        on: event.session_id = session.session_id
+      - to: user
+        type: many_to_one
+        on: event.user_pseudo_id = user.user_pseudo_id
+    dimensions:
+      - name: event_date
+        type: date
+      - name: event_name
+      - name: page_path
+      - name: item_id
+      - name: event_value
+        type: number
+    measures:
+      - name: events
+        expr: COUNT(*)
+      - name: add_to_cart
+        expr: SUM(CASE WHEN event_name = 'add_to_cart' THEN 1 ELSE 0 END)
+      - name: purchases
+        expr: SUM(CASE WHEN event_name = 'purchase' THEN 1 ELSE 0 END)
+
   - name: order
     grain: order_id
-    table: `project.dataset.orders`
+    table: `proj.mall.orders`
     relationships:
-      - to: customer
+      - to: user
         type: many_to_one
-        on: order.customer_id = customer.customer_id
+        on: order.user_pseudo_id = user.user_pseudo_id
+      - to: session
+        type: many_to_one
+        on: order.session_id = session.session_id
     dimensions:
+      - name: order_id
       - name: order_date
         type: date
       - name: status
         valid_values: [completed, cancelled, returned]
+      - name: payment_method
+      - name: channel
     measures:
       - name: orders
         expr: COUNT(DISTINCT order_id)
       - name: gmv
         expr: SUM(net_amount)
+      - name: customers
+        expr: COUNT(DISTINCT user_pseudo_id)
 
 metrics:
+  - name: sessions
+    expr: COUNT(DISTINCT session.session_id)
+  - name: users
+    expr: COUNT(DISTINCT user.user_pseudo_id)
+  - name: events
+    expr: COUNT(*)
   - name: gmv
     expr: SUM(order.net_amount)
     default_filters: [order.status='completed']
+  - name: orders
+    expr: COUNT(DISTINCT order.order_id)
+    default_filters: [order.status='completed']
+  - name: conversion_rate
+    expr: SAFE_DIVIDE(COUNT(DISTINCT order.order_id), COUNT(DISTINCT session.session_id))
+    default_filters: [order.status='completed']
   - name: aov
-    expr: gmv / NULLIF(COUNT(DISTINCT order_id),0)
+    expr: SAFE_DIVIDE(SUM(order.net_amount), NULLIF(COUNT(DISTINCT order.order_id),0))
+    default_filters: [order.status='completed']
+  - name: bounce_rate
+    expr: SAFE_DIVIDE(SUM(CASE WHEN session.is_bounce THEN 1 ELSE 0 END), COUNT(DISTINCT session.session_id))
 
 vocabulary:
   synonyms:
-    '구매': ['주문','order']
-    '매출': ['GMV','거래액']
+    '구매': ['주문','order','purchase','결제']
+    '매출': ['GMV','거래액','매출액']
+    '세션': ['방문','session']
+    '유입': ['첫방문','first_touch','first_channel']
+    '장바구니': ['add_to_cart','장바']
+    '이탈률': ['bounce_rate','바운스']
+    '전환율': ['conversion','conversion_rate','전환']
   units:
     currency: KRW
