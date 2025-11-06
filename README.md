@@ -1,69 +1,48 @@
-# codex-test
+﻿# codex-test
 
-?�런?�엔??추�? ?�정): TypeScript + Vue3 + Element Plus  
-백엔??구현??: FastAPI 기반 NL?�SQL BigQuery ?�멘???�이???�이?�트 ?�캐?�드
+NL→SQL BigQuery 시멘틱 레이어 에이전트 + ChatGPT 스타일 프런트엔드.
+FastAPI(백엔드)와 Vite+Vue3(프런트엔드)로 구성되어 자연어 질의를 SQL로 변환하고 실행/요약을 지원합니다.
 
-## ?�로?�트 구성
-- `app/` ??FastAPI ??  - `main.py` ???�트�? 미들?�어
-  - `routers/` `health.py`, `query.py`
-  - `services/` `nlu.py`, `planner.py`, `sqlgen.py`, `validator.py`, `executor.py`
-  - `semantic/` `semantic.yml`, `metrics_definitions.yaml`
-  - `utils/` `timeparse.py`
-- `tests/` ??기본 ?�스??(`pytest`)
-- `.github/` ??CI, PR ?�플�? CODEOWNERS
+## 프로젝트 구성
+- `app/` 백엔드 FastAPI
+  - `routers/` API 라우트 (`health.py`, `query.py` 등)
+  - `services/` 코어 로직 (NLU/Planner/SQLGen/Validator/Executor/LLM/Prompt)
+  - `semantic/` 시멘틱 모델 (`semantic.yml`, `metrics_definitions.yaml`, `golden_queries.yaml`)
+  - `guardrails.json` 가드레일 정책(금칙어 등)
+- `frontend/` Vite + Vue3 UI (ChatGPT 유사 인터랙션)
+- `tests/` PyTest 기본 테스트
+- `.github/` CI, PR 템플릿, CODEOWNERS
 
-## ?�작?�기 (로컬 개발)
-?�전조건: Python 3.11+, pip(?�는 uv), Git
+## 백엔드(FastAPI)
+- 실행: `uvicorn app.main:app --host 0.0.0.0 --port 8080`
+- API:
+  - `GET /healthz`, `GET /readyz`
+  - `POST /api/query` { q, limit?, dry_run?, use_llm? }
+  - `GET /api/query/stream?q=...&limit=...&dry_run=...&use_llm=...` (SSE: nlu → plan → sql → validated → result)
+- BigQuery:
+  - 기본은 드라이런(`dry_run_only=true`)으로 비용/안전 보장
+  - 실제 실행 시 GCP 인증과 `gcp_project`, `bq_default_location` 필요
+  - DRY RUN 메타: `total_bytes_processed`, `estimated_tb`, `estimated_cost_usd`
+- 가드레일: `app/guardrails.json` 기준으로 금칙어 검사(SELECT * 등)
 
-1) ?�치
-- `pip install -e .[dev]`
+## LLM 설정(OpenAI 기본, Claude/Gemini 지원)
+- `.env` 예시(루트의 `.env.example` 참조):
+  - `llm_provider=openai | claude | gemini`
+  - OpenAI: `openai_api_key`, `openai_model`(기본 gpt-4o-mini)
+  - Claude: `anthropic_api_key`, `anthropic_model`
+  - Gemini: `gemini_api_key`, `gemini_model`
+- 프롬프트에 시멘틱 레이어/메트릭/사전을 주입하여 SQL 정확도 향상
 
-2) ?�행
-- `uvicorn app.main:app --host 0.0.0.0 --port 8080`
-- ?�스체크: `GET /healthz`, `GET /readyz`
-- 질의 ?�시: `POST /api/query` 바디 `{ "q": "지??7??주문 추이" }`
+## 프런트엔드(Vite + Vue3)
+- 설치/실행: `cd frontend && npm ci && npm run dev` (http://localhost:5173)
+- 개발 프록시: `/api` → `http://localhost:8080` (`vite.config.ts`)
+- 기능:
+  - ChatGPT 스타일 대화, 스트리밍 진행(SSE), LLM 토글, Dry Run/Limit 제어
+  - 결과 패널(페이지네이션/CSV 다운로드), 다크 모드
+  - 고급 마크다운(목록/표) + 코드 하이라이트 + 수식(KaTeX) + 다이어그램(Mermaid)
 
-3) ?�스??- `pytest -q`
+## 테스트
+- `pytest -q`
 
-### ?�런?�엔??ChatGPT ?��???UI)
-- ?�치: `frontend/`
-- ?�치: `cd frontend && npm ci`
-- 개발 ?�버: `npm run dev` (기본 http://localhost:5173)
-- 백엔???�록?? `vite.config.ts`?�서 `/api`�?`http://localhost:8080`?�로 ?�록??
-## ?�경(.env) ?�정
-기본값�? ?�전모드(?�라?�런)?�니?? ?�요 ??`.env`�?추�??�세??
-
-?�시 `.env`:
-```
-env=dev
-gcp_project=your-gcp-project
-bq_default_location=asia-northeast3
-maximum_bytes_billed=5000000000
-dry_run_only=true
-```
-
-BigQuery ?�제 ?�행 ?�에??GCP ?�증???�요?�니??
-- `GOOGLE_APPLICATION_CREDENTIALS`???�비??계정 ??경로 ?�정
-- ?�는 ?��????�경(Cloud Run ????기본 ?�증 ?�공
-
-?�런?�엔?�는 추후 `frontend/` ?�렉?�리??Vue3 기반?�로 추�????�정?�니??
-
-## Streaming API (SSE)
-- ?�드?�인?? `GET /api/query/stream?q=...&limit=...&dry_run=...`
-- ?�벤???�름: `nlu` ??`plan` ??`sql` ??`validated` ??`result`
-- ?�런?�엔?�는 기본?�으�??�트리밍 모드가 ?�성?�되???�계�?진행 ?�황???�시?�니??
-
-## LLM ��� SQL ����
-- ����(.env):
-  - llm_provider=openai
-  - openai_api_key=sk-...
-  - openai_model=gpt-4o-mini (����)
-- ���:
-  - REST: POST /api/query { q, use_llm: true, dry_run, limit }
-  - SSE: GET /api/query/stream?q=...&use_llm=true
-- �ø�ƽ ���̾�(semantic.yml, metrics_definitions.yaml)�� ������Ʈ�� �����Ͽ� ��Ȯ�� ���.
-
-
-## ȯ�� ���ø�
-- ��Ʈ�� `.env.example`�� ������ `.env`�� ����ϼ���. GCP/BigQuery �� LLM(openai/claude/gemini) ���� Ű�� ä�� �� ������ ������ϸ� ����˴ϴ�.
-
+## 환경 템플릿
+- 루트의 `.env.example`를 복사해 `.env`로 사용하세요. GCP/BigQuery 및 LLM(openai/claude/gemini) 키를 채운 뒤 서버를 재시작하면 적용됩니다.
