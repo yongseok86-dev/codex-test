@@ -86,23 +86,62 @@ def canary(sql: str, limit_rows: int = 100) -> StepResult:
 
 
 def domain_assertions(sql: str, plan: Optional[Dict[str, Any]] = None) -> StepResult:
+    """Semantic-aware assertions using plan + semantic YAML.
+
+    Checks:
+    - Metric default_filters present
+    - If intent=metric_over_time with grain=day|week|month, SQL groups by a date bucket
+    - If plan has time_window, SQL contains a time predicate
+    - If metric maps to a canonical entity, SQL references that entity's table
+    """
     sem = load_semantic_root()
     metrics_def = sem.get("metrics_definitions.yaml", {}) or {}
+    sem_model = sem.get("semantic.yml", {}) or {}
     metric = (plan or {}).get("metric") if plan else None
+    intent = (plan or {}).get("intent") if plan else None
+    grain = (plan or {}).get("grain") if plan else None
+    slots = (plan or {}).get("slots", {}) if plan else {}
+
+    lowered = sql.lower()
     try:
+        # 1) Metric default filters
         if metric and isinstance(metrics_def, dict):
             items = metrics_def.get("metrics") or []
             if isinstance(items, list):
                 for m in items:
                     if m.get("name") == metric:
-                        # If default_filters exist, ensure tokens appear in SQL
-                        filters = m.get("default_filters") or []
-                        lowered = sql.lower()
-                        for f in filters:
+                        for f in m.get("default_filters") or []:
                             if str(f).lower() not in lowered:
                                 return StepResult(
                                     name="assertions", ok=False,
                                     message=f"missing default filter for metric '{metric}': {f}")
+
+        # 2) Grouping by time bucket for over_time intents
+        if intent == "metric_over_time" and grain:
+            # Heuristic: SQL should contain GROUP BY and a date bucketing (DATE/FORMAT_TIMESTAMP, etc.)
+            if "group by" not in lowered or not any(k in lowered for k in ["date(", "timestamp_trunc", "format_timestamp", "extract("]):
+                return StepResult(name="assertions", ok=False, message="expected time bucketing and GROUP BY for over-time metric")
+
+        # 3) Time window predicate presence when requested
+        if isinstance(slots, dict) and slots.get("time_window"):
+            if not any(tok in lowered for tok in [" where ", "_table_suffix", "timestamp" , "date(", "order_date", "event_date"]):
+                return StepResult(name="assertions", ok=False, message="expected time filter for requested time window")
+
+        # 4) Entity table presence heuristic for metric
+        if metric and isinstance(sem_model, dict):
+            entities = sem_model.get("entities") or []
+            # naive: if metric name matches a measure on an entity, ensure entity table appears
+            target_table = None
+            for e in entities or []:
+                for meas in (e.get("measures") or []):
+                    if meas.get("name") == metric and e.get("table"):
+                        target_table = str(e.get("table")).lower()
+                        break
+                if target_table:
+                    break
+            if target_table and target_table not in lowered:
+                return StepResult(name="assertions", ok=False, message=f"expected entity table reference: {target_table}")
+
         return StepResult(name="assertions", ok=True)
     except Exception as e:
         return StepResult(name="assertions", ok=False, message=str(e))
