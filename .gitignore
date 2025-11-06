@@ -25,3 +25,5 @@ __pycache__/
 # Logs
 *.log
 
+# Python packaging
+*.egg-info/
