@@ -57,3 +57,102 @@ FastAPI(백엔드)와 Vite+Vue3(프런트엔드)로 구성되어 자연어 질�
 - 시멘틱 테이블 경로 오버라이드: `app/semantic/datasets.yaml`에 엔티티별 BigQuery 테이블을 매핑하면 프롬프트와 검증에서 해당 경로로 사용됩니다.
 
 - LLM 프롬프트의 few-shot: golden_queries.yaml에서 자연어 유사도가 높은 예시(NL/intent/slots)를 자동 포함해 SQL 품질을 높입니다.
+## 프로젝트 폴더/파일 구성
+```
+.
+├─ app/
+│  ├─ bq/connector.py            # BigQuery 클라이언트/QueryJobConfig 헬퍼
+│  ├─ config.py                  # Settings(.env): GCP/LLM/머티리얼라이즈/튜닝
+│  ├─ deps.py                    # get_logger()
+│  ├─ main.py                    # FastAPI 앱 팩토리/미들웨어
+│  ├─ routers/
+│  │  ├─ health.py               # /healthz, /readyz
+│  │  └─ query.py                # /api/query, /api/query/stream (SSE)
+│  ├─ semantic/
+│  │  ├─ semantic.yml            # 엔티티/차원/지표/어휘
+│  │  ├─ metrics_definitions.yaml# 메트릭 정의+기본필터
+│  │  ├─ golden_queries.yaml     # 한국어 골든쿼리
+│  │  ├─ datasets.yaml           # 엔티티→BQ 테이블 매핑
+│  │  └─ loader.py               # 시멘틱 로더/오버라이드 적용
+│  ├─ services/
+│  │  ├─ nlu.py                  # extract()
+│  │  ├─ planner.py              # make_plan()
+│  │  ├─ sqlgen.py               # generate() 규칙기반 SQL
+│  │  ├─ validator.py            # ensure_safe(), lint()
+│  │  ├─ validation.py           # lint→dry_run→explain→schema→canary→assertions
+│  │  ├─ executor.py             # run(), materialize()
+│  │  ├─ prompt.py               # build_sql_prompt() + few-shot
+│  │  └─ llm.py                  # generate_sql_via_llm()
+│  └─ utils/timeparse.py         # last_n_days_utc()
+├─ frontend/
+│  ├─ index.html
+│  ├─ vite.config.ts             # /api 프록시
+│  ├─ package.json
+│  └─ src/
+│     ├─ App.vue                 # 레이아웃/다크모드/히스토리
+│     ├─ main.ts                 # 부트스트랩(CSS 포함)
+│     ├─ views/ChatView.vue      # 스트리밍/LLM 토글/전송 로직
+│     ├─ components/
+│     │  ├─ ChatInput.vue        # 입력/전송
+│     │  ├─ ChatMessage.vue      # MD/KaTeX/Mermaid 렌더
+│     │  └─ ResultPanel.vue      # 테이블/페이지네이션/CSV
+│     └─ store/chat.ts           # 대화 저장/복원
+├─ tests/                        # 기본 테스트
+├─ .github/                      # CI/PR/CODEOWNERS
+└─ AGENTS.md, README.md, .env.example
+```
+
+## 파일별 함수/클래스 개요(간단 주석)
+- app/config.py
+  - class Settings: GCP(BigQuery)/LLM(API Key, 모델, 온도/토큰/시스템프롬프트)/머티리얼라이즈 설정
+- app/deps.py
+  - get_logger(name, level): 구조화/스트림 로거 생성
+- app/main.py
+  - create_app(): FastAPI 앱 구성, 라우터/미들웨어 등록
+- app/routers/health.py
+  - healthz(), readyz(): 상태 점검 엔드포인트
+- app/routers/query.py
+  - class QueryRequest/QueryResponse: 요청/응답 모델
+  - query(req): NLU→Plan→SQL(LLM/규칙)→검증파이프라인→실행/머티리얼라이즈
+  - query_stream(...): 위 흐름을 SSE 이벤트(nlu/plan/sql/validated/check/result)로 스트리밍
+- app/services/nlu.py
+  - extract(q): 의도/슬롯(메트릭/기간 힌트) 추출(휴리스틱)
+- app/services/planner.py
+  - make_plan(intent, slots): 기본 grain/metric 보정, 계획 생성
+- app/services/sqlgen.py
+  - generate(plan, limit): BigQuery 방언 규칙 기반 SQL 생성
+- app/services/validator.py
+  - ensure_safe(sql): 변형/SELECT * 금지 등 가드레일 검사
+  - lint(sql): 시간필터/SELECT * 등 린트 이슈 반환
+- app/services/validation.py
+  - StepResult, ValidationReport: 단계 결과/리포트 모델
+  - lint_sql(), dry_run(), explain(), schema(), canary(): 단계별 검증 수행
+  - domain_assertions(sql, plan): 시멘틱/메트릭 기반 도메인 규칙 검사
+  - run_pipeline(sql, perform_execute, plan): 권장 검증 흐름 실행
+- app/services/executor.py
+  - class QueryResult: rows/meta 컨테이너
+  - run(sql, dry_run): DRY RUN/실행 및 메타(비용추정 등) 반환
+  - materialize(sql): 설정된 데이터셋에 결과 테이블 생성(만료시간 설정)
+- app/services/prompt.py
+  - build_sql_prompt(question, semantic): 시멘틱/메트릭/어휘+골든쿼리 few-shot 포함 프롬프트
+- app/services/llm.py
+  - generate_sql_via_llm(question, provider): OpenAI/Claude/Gemini로 SQL 생성, 코드펜스에서 추출
+- app/semantic/loader.py
+  - load_semantic_root(): 시멘틱/메트릭/골든쿼리 로딩
+  - load_datasets_overrides(): datasets.yaml 읽기
+  - apply_table_overrides(model, overrides): 엔티티 테이블 경로 치환
+- app/bq/connector.py
+  - available(), client(), base_job_config(), run_query(): BigQuery 실행 헬퍼
+- app/utils/timeparse.py
+  - last_n_days_utc(n): 최근 n일 UTC 구간 반환
+- frontend/src/views/ChatView.vue
+  - onSend(text): REST/SSE로 질의 전송, LLM/스트리밍/드라이런/리밋 반영
+  - clear(): 안내 메시지 출력(새 채팅 유도)
+- frontend/src/components/ChatMessage.vue
+  - rendered(computed): marked+KaTeX+Mermaid 렌더, DOMPurify로 sanitize
+- frontend/src/components/ResultPanel.vue
+  - columns/paged(computed), downloadCsv(): 결과 표 렌더/CSV 저장, 페이지네이션
+- frontend/src/components/ChatInput.vue
+  - emitSend(): 엔터/버튼 전송
+- frontend/src/store/chat.ts
+  - types(Role/Message/Result/Conversation), newConversation(), selectConversation(), addMessage(), setResult(): 로컬스토리지 저장/복원
