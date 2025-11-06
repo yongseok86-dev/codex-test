@@ -156,3 +156,77 @@ FastAPI(백엔드)와 Vite+Vue3(프런트엔드)로 구성되어 자연어 질�
   - emitSend(): 엔터/버튼 전송
 - frontend/src/store/chat.ts
   - types(Role/Message/Result/Conversation), newConversation(), selectConversation(), addMessage(), setResult(): 로컬스토리지 저장/복원
+## Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant FE as Frontend (ChatView)
+    participant API as FastAPI (/api/query | /api/query/stream)
+    participant NLU as NLU (extract)
+    participant PL as Planner (make_plan)
+    participant LLM as LLM Provider<br/>(OpenAI/Claude/Gemini)
+    participant SG as SQLGen (Rule-based)
+    participant VAL as Guardrails (ensure_safe + lint)
+    participant PIPE as Validation Pipeline
+    participant BQ as BigQuery<br/>(via Connector)
+    participant EXE as Executor (run/materialize)
+    participant UI as Result Panel
+
+    U->>FE: 자연어 질의 입력
+    FE->>API: POST /api/query {q, dry_run, limit, use_llm, llm_provider, materialize}\n or GET /api/query/stream...
+    API->>NLU: extract(q)
+    NLU-->>API: intent, slots
+    API->>PL: make_plan(intent, slots)
+    PL-->>API: plan
+
+    alt use_llm == true
+        API->>LLM: Prompt(semantic + metrics + golden few-shot)
+        LLM-->>API: SQL (```sql ... ```)
+    else
+        API->>SG: generate(plan, limit)
+        SG-->>API: SQL
+    end
+
+    API->>VAL: ensure_safe(sql)
+    VAL-->>API: ok (or violation → abort)
+
+    API->>PIPE: run_pipeline(sql, plan)
+    PIPE->>VAL: lint(sql) (SELECT * / time filter 등)
+    VAL-->>PIPE: issues
+    PIPE->>BQ: DRY RUN (bytes, cost)
+    BQ-->>PIPE: total_bytes_processed / errors
+    PIPE->>BQ: EXPLAIN sql
+    BQ-->>PIPE: stages/operators
+    PIPE->>BQ: SELECT * FROM (sql) LIMIT 0
+    BQ-->>PIPE: schema(fields)
+    PIPE->>BQ: SELECT * FROM (sql) LIMIT N (canary)
+    BQ-->>PIPE: sample rows count
+    PIPE-->>API: steps report
+
+    alt dry_run == true
+        API->>EXE: run(sql, dry_run=true)
+        EXE-->>API: meta(dry_run,cost)
+    else materialize == true
+        API->>EXE: materialize(sql)
+        EXE->>BQ: CTAS/TRUNCATE to dataset.table
+        BQ-->>EXE: ok
+        EXE-->>API: meta(destination table)
+    else full execute
+        API->>EXE: run(sql, dry_run=false)
+        EXE->>BQ: execute query
+        BQ-->>EXE: rows
+        EXE-->>API: rows + meta
+    end
+
+    opt SSE streaming
+        API-->>FE: event: nlu / plan / sql / validated / check(step-by-step) / result
+    end
+    API-->>FE: JSON { sql, dry_run, rows?, metadata(validation_steps, cost, etc.) }
+
+    FE->>UI: SQL/메타/테이블 업데이트(페이지네이션/CSV)
+    UI-->>U: 결과 표시
+
+    note over API: LLM 실패 시 경고 로그 기록, 규칙 기반으로 폴백
+```
