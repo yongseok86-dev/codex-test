@@ -6,28 +6,26 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { marked } from 'marked'
+import hljs from 'highlight.js'
+import DOMPurify from 'dompurify'
 
 const props = defineProps<{ role: 'user' | 'assistant' | 'system', content: string }>()
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'} as any)[c])
-}
-
-function renderSimpleMarkdown(src: string): string {
-  // very small renderer: code fences + line breaks
-  const parts = src.split(/```/)
-  let html = ''
-  for (let i = 0; i < parts.length; i++) {
-    if (i % 2 === 1) {
-      html += `<pre><code>${escapeHtml(parts[i])}</code></pre>`
-    } else {
-      html += escapeHtml(parts[i]).replace(/\n/g, '<br/>')
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+  headerIds: false,
+  mangle: false,
+  highlight(code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(code, { language: lang }).value
     }
+    return hljs.highlightAuto(code).value
   }
-  return html
-}
+})
 
-const rendered = computed(() => renderSimpleMarkdown(props.content))
+const rendered = computed(() => DOMPurify.sanitize(marked.parse(props.content)))
 </script>
 
 <style scoped>
