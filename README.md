@@ -46,3 +46,6 @@ FastAPI(백엔드)와 Vite+Vue3(프런트엔드)로 구성되어 자연어 질�
 
 ## 환경 템플릿
 - 루트의 `.env.example`를 복사해 `.env`로 사용하세요. GCP/BigQuery 및 LLM(openai/claude/gemini) 키를 채운 뒤 서버를 재시작하면 적용됩니다.
+
+- LLM 선택: 프런트엔드에서 Provider(OpenAI/Claude/Gemini)만 선택합니다. 키/토큰/튜닝(온도, 토큰)은 백엔드 .env 설정으로 관리하며, 제공자 호출 실패 시 서버 로그에 경고를 남기고 규칙 기반 SQL로 자동 폴백합니다.
+

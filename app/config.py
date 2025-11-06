@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     anthropic_model: str | None = None
     gemini_api_key: str | None = None
     gemini_model: str | None = None
+    # LLM tuning
+    llm_temperature: float = 0.1
+    llm_max_tokens: int = 1024
+    llm_system_prompt: str | None = (
+        "You are an expert data analyst. Generate ONLY BigQuery SQL inside a code fence."
+    )
 
     class Config:
         env_file = ".env"

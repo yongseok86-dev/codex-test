@@ -4,6 +4,7 @@ from typing import Optional
 from app.services import prompt as prompt_builder
 from app.semantic.loader import load_semantic_root
 from app.config import settings
+from app.deps import get_logger
 
 try:
     from openai import OpenAI  # type: ignore
@@ -30,6 +31,10 @@ def generate_sql_via_llm(question: str, provider: Optional[str] = None) -> str:
     prompt = prompt_builder.build_sql_prompt(question, semantic)
 
     provider = (provider or settings.llm_provider or "").lower()
+    system_prompt = settings.llm_system_prompt or "Generate ONLY SQL in BigQuery dialect in a code fence."
+    temperature = float(getattr(settings, "llm_temperature", 0.1))
+    max_tokens = int(getattr(settings, "llm_max_tokens", 1024))
+    logger = get_logger(__name__)
     if provider == "openai":
         if OpenAI is None or not settings.openai_api_key:
             raise LLMNotConfigured("OpenAI provider not available or missing API key")
@@ -38,10 +43,11 @@ def generate_sql_via_llm(question: str, provider: Optional[str] = None) -> str:
         resp = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": "You generate only SQL in code fences."},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.1,
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
         content = resp.choices[0].message.content or ""
         return _extract_sql_from_text(content)
@@ -53,9 +59,9 @@ def generate_sql_via_llm(question: str, provider: Optional[str] = None) -> str:
         model = settings.anthropic_model or "claude-3-5-sonnet-20240620"
         resp = client.messages.create(
             model=model,
-            max_tokens=1024,
-            temperature=0.1,
-            system="You generate only SQL in code fences.",
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system=system_prompt,
             messages=[{"role": "user", "content": prompt}],
         )
         # content is a list of content blocks; take text
@@ -72,7 +78,10 @@ def generate_sql_via_llm(question: str, provider: Optional[str] = None) -> str:
         genai.configure(api_key=settings.gemini_api_key)
         model = settings.gemini_model or "gemini-1.5-flash"
         m = genai.GenerativeModel(model)
-        resp = m.generate_content(prompt)
+        resp = m.generate_content(prompt, generation_config={
+            "temperature": temperature,
+            "max_output_tokens": max_tokens,
+        })
         content = getattr(resp, "text", None) or "\n".join(getattr(resp, "candidates", []) or [])
         return _extract_sql_from_text(content)
 

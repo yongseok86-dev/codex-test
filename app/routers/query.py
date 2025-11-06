@@ -7,6 +7,7 @@ from app.config import settings
 from app.deps import get_logger
 from app.services import nlu, planner, sqlgen, validator, executor
 from app.services.llm import generate_sql_via_llm, LLMNotConfigured
+from app.deps import get_logger
 
 
 router = APIRouter(prefix="/api", tags=["query"])
@@ -30,6 +31,7 @@ class QueryResponse(BaseModel):
 
 @router.post("/query", response_model=QueryResponse)
 async def query(req: QueryRequest) -> QueryResponse:
+    logger = get_logger(__name__)
     if not req.q or len(req.q.strip()) < 2:
         raise HTTPException(status_code=400, detail="query text 'q' is required")
 
@@ -41,8 +43,9 @@ async def query(req: QueryRequest) -> QueryResponse:
     if req.use_llm:
         try:
             sql = generate_sql_via_llm(req.q, provider=req.llm_provider)
-        except LLMNotConfigured as e:
-            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.warning(f"LLM provider failed, falling back to rule-based: {e}")
+            sql = sqlgen.generate(plan, limit=req.limit)
     else:
         sql = sqlgen.generate(plan, limit=req.limit)
     # 4) Guardrails/Validation
@@ -62,6 +65,7 @@ async def query(req: QueryRequest) -> QueryResponse:
 
 @router.get("/query/stream")
 async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = None, use_llm: bool | None = None, llm_provider: str | None = None):
+    logger = get_logger(__name__)
     async def event_gen():
         def sse(event: str, data: dict):
             payload = json.dumps(data, ensure_ascii=False)
@@ -82,8 +86,10 @@ async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = N
                 sql = generate_sql_via_llm(q, provider=llm_provider)
                 yield sse("sql", {"sql": sql, "source": "llm", "provider": llm_provider or ""})
             except Exception as e:
-                yield sse("validated", {"ok": False, "error": f"LLM error: {e}"})
-                return
+                logger.warning(f"LLM provider failed, fallback to rule-based: {e}")
+                yield sse("info", {"message": "LLM provider failed; falling back to rule-based SQL."})
+                sql = sqlgen.generate(plan, limit=limit)
+                yield sse("sql", {"sql": sql, "source": "rule"})
         else:
             sql = sqlgen.generate(plan, limit=limit)
             yield sse("sql", {"sql": sql, "source": "rule"})
