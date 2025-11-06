@@ -8,6 +8,7 @@ from app.deps import get_logger
 from app.services import nlu, planner, sqlgen, validator, executor
 from app.services.llm import generate_sql_via_llm, LLMNotConfigured
 from app.deps import get_logger
+from app.services.validation import run_pipeline
 
 
 router = APIRouter(prefix="/api", tags=["query"])
@@ -48,19 +49,25 @@ async def query(req: QueryRequest) -> QueryResponse:
             sql = sqlgen.generate(plan, limit=req.limit)
     else:
         sql = sqlgen.generate(plan, limit=req.limit)
-    # 4) Guardrails/Validation
+    # 4) Guardrails/Validation (lint + pipeline)
     validator.ensure_safe(sql)
+    report = run_pipeline(sql, perform_execute=False)
 
-    # 5) Execute (or DRY RUN)
+    # 5) Execute (or DRY RUN) — after validations
     dry = settings.dry_run_only if req.dry_run is None else req.dry_run
-    result = await executor.run(sql, dry_run=dry)
+    if dry:
+        result = await executor.run(sql, dry_run=True)
+    else:
+        result = await executor.run(sql, dry_run=False)
 
     logger.info(
         "query_executed",
         extra={"intent": intent, "slots": slots, "dry_run": dry},
     )
 
-    return QueryResponse(sql=sql, dry_run=dry, rows=result.rows, metadata=result.meta)
+    meta = result.meta or {}
+    meta["validation_steps"] = [s.__dict__ for s in report.steps]
+    return QueryResponse(sql=sql, dry_run=dry, rows=result.rows, metadata=meta)
 
 
 @router.get("/query/stream")
@@ -97,6 +104,10 @@ async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = N
         try:
             validator.ensure_safe(sql)
             yield sse("validated", {"ok": True})
+            # Run validation pipeline
+            report = run_pipeline(sql, perform_execute=False)
+            for step in report.steps:
+                yield sse("check", {"name": step.name, "ok": step.ok, "message": step.message, "meta": step.meta})
         except Exception as e:
             yield sse("validated", {"ok": False, "error": str(e)})
             return
