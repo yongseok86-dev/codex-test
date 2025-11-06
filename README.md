@@ -27,6 +27,12 @@
 3) 테스트
 - `pytest -q`
 
+### 프런트엔드(ChatGPT 스타일 UI)
+- 위치: `frontend/`
+- 설치: `cd frontend && npm ci`
+- 개발 서버: `npm run dev` (기본 http://localhost:5173)
+- 백엔드 프록시: `vite.config.ts`에서 `/api`를 `http://localhost:8080`으로 프록시
+
 ## 환경(.env) 설정
 기본값은 안전모드(드라이런)입니다. 필요 시 `.env`를 추가하세요.
 
