@@ -63,3 +63,7 @@ BigQuery ?ㅼ젣 ?ㅽ뻾 ?쒖뿉??GCP ?몄쬆???꾩슂?⑸땲??
   - SSE: GET /api/query/stream?q=...&use_llm=true
 - 시멘틱 레이어(semantic.yml, metrics_definitions.yaml)를 프롬프트에 주입하여 정확도 향상.
 
+
+## 환경 템플릿
+- 루트의 `.env.example`를 복사해 `.env`로 사용하세요. GCP/BigQuery 및 LLM(openai/claude/gemini) 설정 키를 채운 뒤 서버를 재시작하면 적용됩니다.
+
