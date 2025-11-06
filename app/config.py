@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     llm_system_prompt: str | None = (
         "You are an expert data analyst. Generate ONLY BigQuery SQL inside a code fence."
     )
+    # Materialization
+    bq_materialize_dataset: str | None = None  # e.g., project.dataset
+    bq_materialize_expiration_hours: int = 24
 
     class Config:
         env_file = ".env"

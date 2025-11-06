@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+from app.semantic.loader import load_semantic_root
 
 from app.services import validator
 from app.bq import connector
@@ -84,13 +85,30 @@ def canary(sql: str, limit_rows: int = 100) -> StepResult:
         return StepResult("canary", ok=False, message=str(e))
 
 
-def domain_assertions(sql: str) -> StepResult:
-    # Placeholder: add business/domain rules here
-    # For now, pass-through success
-    return StepResult(name="assertions", ok=True)
+def domain_assertions(sql: str, plan: Optional[Dict[str, Any]] = None) -> StepResult:
+    sem = load_semantic_root()
+    metrics_def = sem.get("metrics_definitions.yaml", {}) or {}
+    metric = (plan or {}).get("metric") if plan else None
+    try:
+        if metric and isinstance(metrics_def, dict):
+            items = metrics_def.get("metrics") or []
+            if isinstance(items, list):
+                for m in items:
+                    if m.get("name") == metric:
+                        # If default_filters exist, ensure tokens appear in SQL
+                        filters = m.get("default_filters") or []
+                        lowered = sql.lower()
+                        for f in filters:
+                            if str(f).lower() not in lowered:
+                                return StepResult(
+                                    name="assertions", ok=False,
+                                    message=f"missing default filter for metric '{metric}': {f}")
+        return StepResult(name="assertions", ok=True)
+    except Exception as e:
+        return StepResult(name="assertions", ok=False, message=str(e))
 
 
-def run_pipeline(sql: str, perform_execute: bool = False) -> ValidationReport:
+def run_pipeline(sql: str, perform_execute: bool = False, plan: Optional[Dict[str, Any]] = None) -> ValidationReport:
     steps: List[StepResult] = []
 
     # 1) Lint
@@ -120,10 +138,9 @@ def run_pipeline(sql: str, perform_execute: bool = False) -> ValidationReport:
         return ValidationReport(steps=steps, sql=sql, schema=sch.meta.get("schema"))
 
     # 6) DOMAIN ASSERTIONS
-    steps.append(domain_assertions(sql))
+    steps.append(domain_assertions(sql, plan=plan))
     if not steps[-1].ok:
         return ValidationReport(steps=steps, sql=sql, schema=sch.meta.get("schema"))
 
     # 7) FINAL EXECUTION is handled by caller if desired.
     return ValidationReport(steps=steps, sql=sql, schema=sch.meta.get("schema"))
-

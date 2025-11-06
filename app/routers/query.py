@@ -21,6 +21,7 @@ class QueryRequest(BaseModel):
     dry_run: bool | None = None
     use_llm: bool | None = None
     llm_provider: str | None = None  # 'openai' | 'claude' | 'gemini'
+    materialize: bool | None = None
 
 
 class QueryResponse(BaseModel):
@@ -51,14 +52,17 @@ async def query(req: QueryRequest) -> QueryResponse:
         sql = sqlgen.generate(plan, limit=req.limit)
     # 4) Guardrails/Validation (lint + pipeline)
     validator.ensure_safe(sql)
-    report = run_pipeline(sql, perform_execute=False)
+    report = run_pipeline(sql, perform_execute=False, plan=plan)
 
     # 5) Execute (or DRY RUN) — after validations
     dry = settings.dry_run_only if req.dry_run is None else req.dry_run
     if dry:
         result = await executor.run(sql, dry_run=True)
     else:
-        result = await executor.run(sql, dry_run=False)
+        if req.materialize:
+            result = await executor.materialize(sql)
+        else:
+            result = await executor.run(sql, dry_run=False)
 
     logger.info(
         "query_executed",
@@ -105,7 +109,7 @@ async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = N
             validator.ensure_safe(sql)
             yield sse("validated", {"ok": True})
             # Run validation pipeline
-            report = run_pipeline(sql, perform_execute=False)
+            report = run_pipeline(sql, perform_execute=False, plan=plan)
             for step in report.steps:
                 yield sse("check", {"name": step.name, "ok": step.ok, "message": step.message, "meta": step.meta})
         except Exception as e:
