@@ -1,0 +1,8 @@
+metrics:
+  - name: gmv
+    description: Gross Merchandise Value (completed orders)
+    expr: SUM(net_amount)
+  - name: orders
+    description: Count of distinct orders
+    expr: COUNT(DISTINCT order_id)
+

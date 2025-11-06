@@ -1,0 +1,15 @@
+# Placeholder semantic model (draft)
+entities:
+  - name: order
+    grain: order_id
+    table: `project.dataset.orders`
+    dimensions:
+      - name: order_date
+        type: date
+      - name: channel
+    measures:
+      - name: orders
+        expr: COUNT(DISTINCT order_id)
+      - name: gmv
+        expr: SUM(net_amount)
+
