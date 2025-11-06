@@ -20,17 +20,15 @@
   </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import ChatView from './views/ChatView.vue'
+import { useChatStore } from './store/chat'
 
-const history = ref<{ title: string }[]>([])
+const { conversations, newConversation, selectConversation } = useChatStore()
+const history = computed(() => conversations.value.map(c => ({ title: c.title })))
 const isDark = ref<boolean>(() => localStorage.getItem('theme') === 'dark' as any)
-function newChat() {
-  // placeholder
-}
-function openChat(_i: number) {
-  // placeholder
-}
+function newChat() { newConversation() }
+function openChat(i: number) { selectConversation(conversations.value[i].id) }
 
 watch(isDark, (v) => {
   localStorage.setItem('theme', v ? 'dark' : 'light')

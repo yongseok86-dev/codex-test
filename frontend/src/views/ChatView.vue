@@ -22,14 +22,16 @@ import { ref, nextTick } from 'vue'
 import ChatMessage from '../components/ChatMessage.vue'
 import ChatInput from '../components/ChatInput.vue'
 import ResultPanel from '../components/ResultPanel.vue'
+import { useChatStore } from '../store/chat'
 
+const { current, addMessage, setResult } = useChatStore()
 type Msg = { role: 'user' | 'assistant' | 'system', content: string }
-const messages = ref<Msg[]>([{ role: 'system', content: '질문을 입력하면 NL→SQL 생성 후 결과를 보여줍니다.' }])
+const messages = computed(() => current.value.messages.map(m => ({ role: m.role, content: m.content })))
 const loading = ref(false)
 const scrollEl = ref<HTMLElement | null>(null)
 const dryRun = ref(true)
 const limit = ref(100)
-const lastResult = ref<any | null>(null)
+const lastResult = computed(() => current.value.lastResult)
 
 function scrollToBottom() {
   nextTick(() => {
@@ -39,7 +41,7 @@ function scrollToBottom() {
 
 async function onSend(text: string) {
   if (!text.trim()) return
-  messages.value.push({ role: 'user', content: text })
+  addMessage('user', text)
   loading.value = true
   scrollToBottom()
   try {
@@ -51,10 +53,10 @@ async function onSend(text: string) {
     })
     if (!r.ok) throw new Error(await r.text())
     const body = await r.json()
-    messages.value.push({ role: 'assistant', content: 'SQL이 생성되었습니다. 아래 결과 패널을 확인하세요.' })
-    lastResult.value = body
+    addMessage('assistant', 'SQL이 생성되었습니다. 아래 결과 패널을 확인하세요.')
+    setResult(body)
   } catch (e: any) {
-    messages.value.push({ role: 'assistant', content: `오류: ${e?.message || e}` })
+    addMessage('assistant', `오류: ${e?.message || e}`)
   } finally {
     loading.value = false
     scrollToBottom()
@@ -62,8 +64,8 @@ async function onSend(text: string) {
 }
 
 function clear() {
-  messages.value = [{ role: 'system', content: '새 채팅을 시작했습니다.' }]
-  lastResult.value = null
+  // advise user to start a new chat in sidebar
+  addMessage('system', '대화를 초기화하려면 좌측의 새 채팅을 눌러주세요.')
 }
 </script>
 

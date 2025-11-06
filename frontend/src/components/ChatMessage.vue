@@ -6,13 +6,21 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { marked } from 'marked'
+import hljs from 'highlight.js'
 
 const props = defineProps<{ role: 'user' | 'assistant' | 'system', content: string }>()
-const rendered = computed(() =>
-  props.content
-    .replaceAll('\n', '<br/>')
-    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-)
+
+marked.setOptions({
+  highlight(code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(code, { language: lang }).value
+    }
+    return hljs.highlightAuto(code).value
+  }
+})
+
+const rendered = computed(() => marked.parse(props.content))
 </script>
 
 <style scoped>
