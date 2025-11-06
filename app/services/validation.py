@@ -101,6 +101,16 @@ def domain_assertions(sql: str, plan: Optional[Dict[str, Any]] = None) -> StepRe
     intent = (plan or {}).get("intent") if plan else None
     grain = (plan or {}).get("grain") if plan else None
     slots = (plan or {}).get("slots", {}) if plan else {}
+    # Validate group_by dims if provided in slots
+    if isinstance(slots, dict) and slots.get("group_by"):
+        try:
+            g = slots.get("group_by") or []
+            if isinstance(g, list):
+                for dim in g:
+                    if str(dim).lower() not in lowered:
+                        return StepResult(name="assertions", ok=False, message=f"missing group_by dimension in SQL: {dim}")
+        except Exception:
+            pass
 
     lowered = sql.lower()
     try:

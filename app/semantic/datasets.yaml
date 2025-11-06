@@ -1,0 +1,8 @@
+# Map entity names to fully-qualified BigQuery tables.
+# Edit to match your environment; unknown keys are ignored.
+# Example:
+# user: project.dataset.users
+# session: project.dataset.sessions
+# event: project.dataset.events
+# order: project.dataset.orders
+

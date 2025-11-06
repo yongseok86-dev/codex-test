@@ -53,3 +53,7 @@ FastAPI(백엔드)와 Vite+Vue3(프런트엔드)로 구성되어 자연어 질�
 - 검증 흐름: 규칙 린팅 → DRY RUN → EXPLAIN → LIMIT 0 스키마 → 카나리아 → 도메인 규칙 → 전체 실행/머티뷰.
 
 - 실행 옵션: REST 바디 `materialize: true` 로 결과를 BigQuery 테이블로 머티리얼라이즈(만료시간 기본 24h, .env 설정).
+
+- 시멘틱 테이블 경로 오버라이드: `app/semantic/datasets.yaml`에 엔티티별 BigQuery 테이블을 매핑하면 프롬프트와 검증에서 해당 경로로 사용됩니다.
+
+- LLM 프롬프트의 few-shot: golden_queries.yaml에서 자연어 유사도가 높은 예시(NL/intent/slots)를 자동 포함해 SQL 품질을 높입니다.
