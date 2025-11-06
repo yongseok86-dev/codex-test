@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from app.config import settings
 from app.deps import get_logger
 from app.services import nlu, planner, sqlgen, validator, executor
+from app.services.llm import generate_sql_via_llm, LLMNotConfigured
 
 
 router = APIRouter(prefix="/api", tags=["query"])
@@ -16,6 +17,7 @@ class QueryRequest(BaseModel):
     q: str
     limit: int | None = 100
     dry_run: bool | None = None
+    use_llm: bool | None = None
 
 
 class QueryResponse(BaseModel):
@@ -34,8 +36,14 @@ async def query(req: QueryRequest) -> QueryResponse:
     intent, slots = nlu.extract(req.q)
     # 2) Plan
     plan = planner.make_plan(intent=intent, slots=slots)
-    # 3) SQL Generation (BigQuery dialect)
-    sql = sqlgen.generate(plan, limit=req.limit)
+    # 3) SQL Generation (LLM or rule-based)
+    if req.use_llm:
+        try:
+            sql = generate_sql_via_llm(req.q)
+        except LLMNotConfigured as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    else:
+        sql = sqlgen.generate(plan, limit=req.limit)
     # 4) Guardrails/Validation
     validator.ensure_safe(sql)
 
@@ -52,7 +60,7 @@ async def query(req: QueryRequest) -> QueryResponse:
 
 
 @router.get("/query/stream")
-async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = None):
+async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = None, use_llm: bool | None = None):
     async def event_gen():
         def sse(event: str, data: dict):
             payload = json.dumps(data, ensure_ascii=False)
@@ -68,8 +76,16 @@ async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = N
         plan = planner.make_plan(intent=intent, slots=slots)
         yield sse("plan", plan)
 
-        sql = sqlgen.generate(plan, limit=limit)
-        yield sse("sql", {"sql": sql})
+        if use_llm:
+            try:
+                sql = generate_sql_via_llm(q)
+                yield sse("sql", {"sql": sql, "source": "llm"})
+            except Exception as e:
+                yield sse("validated", {"ok": False, "error": f"LLM error: {e}"})
+                return
+        else:
+            sql = sqlgen.generate(plan, limit=limit)
+            yield sse("sql", {"sql": sql, "source": "rule"})
 
         try:
             validator.ensure_safe(sql)

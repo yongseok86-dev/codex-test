@@ -1,42 +1,39 @@
 # codex-test
 
-프런트엔드(추가 예정): TypeScript + Vue3 + Element Plus  
-백엔드(구현됨): FastAPI 기반 NL→SQL BigQuery 시멘틱 레이어 에이전트 스캐폴드
+?�런?�엔??추�? ?�정): TypeScript + Vue3 + Element Plus  
+백엔??구현??: FastAPI 기반 NL?�SQL BigQuery ?�멘???�이???�이?�트 ?�캐?�드
 
-## 프로젝트 구성
-- `app/` – FastAPI 앱
-  - `main.py` 앱 엔트리, 미들웨어
+## ?�로?�트 구성
+- `app/` ??FastAPI ??  - `main.py` ???�트�? 미들?�어
   - `routers/` `health.py`, `query.py`
   - `services/` `nlu.py`, `planner.py`, `sqlgen.py`, `validator.py`, `executor.py`
   - `semantic/` `semantic.yml`, `metrics_definitions.yaml`
   - `utils/` `timeparse.py`
-- `tests/` – 기본 테스트 (`pytest`)
-- `.github/` – CI, PR 템플릿, CODEOWNERS
+- `tests/` ??기본 ?�스??(`pytest`)
+- `.github/` ??CI, PR ?�플�? CODEOWNERS
 
-## 시작하기 (로컬 개발)
-사전조건: Python 3.11+, pip(또는 uv), Git
+## ?�작?�기 (로컬 개발)
+?�전조건: Python 3.11+, pip(?�는 uv), Git
 
-1) 설치
+1) ?�치
 - `pip install -e .[dev]`
 
-2) 실행
+2) ?�행
 - `uvicorn app.main:app --host 0.0.0.0 --port 8080`
-- 헬스체크: `GET /healthz`, `GET /readyz`
-- 질의 예시: `POST /api/query` 바디 `{ "q": "지난 7일 주문 추이" }`
+- ?�스체크: `GET /healthz`, `GET /readyz`
+- 질의 ?�시: `POST /api/query` 바디 `{ "q": "지??7??주문 추이" }`
 
-3) 테스트
-- `pytest -q`
+3) ?�스??- `pytest -q`
 
-### 프런트엔드(ChatGPT 스타일 UI)
-- 위치: `frontend/`
-- 설치: `cd frontend && npm ci`
-- 개발 서버: `npm run dev` (기본 http://localhost:5173)
-- 백엔드 프록시: `vite.config.ts`에서 `/api`를 `http://localhost:8080`으로 프록시
+### ?�런?�엔??ChatGPT ?��???UI)
+- ?�치: `frontend/`
+- ?�치: `cd frontend && npm ci`
+- 개발 ?�버: `npm run dev` (기본 http://localhost:5173)
+- 백엔???�록?? `vite.config.ts`?�서 `/api`�?`http://localhost:8080`?�로 ?�록??
+## ?�경(.env) ?�정
+기본값�? ?�전모드(?�라?�런)?�니?? ?�요 ??`.env`�?추�??�세??
 
-## 환경(.env) 설정
-기본값은 안전모드(드라이런)입니다. 필요 시 `.env`를 추가하세요.
-
-예시 `.env`:
+?�시 `.env`:
 ```
 env=dev
 gcp_project=your-gcp-project
@@ -45,13 +42,24 @@ maximum_bytes_billed=5000000000
 dry_run_only=true
 ```
 
-BigQuery 실제 실행 시에는 GCP 인증이 필요합니다.
-- `GOOGLE_APPLICATION_CREDENTIALS`에 서비스 계정 키 경로 설정
-- 또는 런타임 환경(Cloud Run 등)에 기본 인증 제공
+BigQuery ?�제 ?�행 ?�에??GCP ?�증???�요?�니??
+- `GOOGLE_APPLICATION_CREDENTIALS`???�비??계정 ??경로 ?�정
+- ?�는 ?��????�경(Cloud Run ????기본 ?�증 ?�공
 
-프런트엔드는 추후 `frontend/` 디렉터리에 Vue3 기반으로 추가할 예정입니다.
+?�런?�엔?�는 추후 `frontend/` ?�렉?�리??Vue3 기반?�로 추�????�정?�니??
 
 ## Streaming API (SSE)
-- 엔드포인트: `GET /api/query/stream?q=...&limit=...&dry_run=...`
-- 이벤트 흐름: `nlu` → `plan` → `sql` → `validated` → `result`
-- 프런트엔드는 기본적으로 스트리밍 모드가 활성화되어 단계별 진행 상황을 표시합니다.
+- ?�드?�인?? `GET /api/query/stream?q=...&limit=...&dry_run=...`
+- ?�벤???�름: `nlu` ??`plan` ??`sql` ??`validated` ??`result`
+- ?�런?�엔?�는 기본?�으�??�트리밍 모드가 ?�성?�되???�계�?진행 ?�황???�시?�니??
+
+## LLM ��� SQL ����
+- ����(.env):
+  - llm_provider=openai
+  - openai_api_key=sk-...
+  - openai_model=gpt-4o-mini (����)
+- ���:
+  - REST: POST /api/query { q, use_llm: true, dry_run, limit }
+  - SSE: GET /api/query/stream?q=...&use_llm=true
+- �ø�ƽ ���̾�(semantic.yml, metrics_definitions.yaml)�� ������Ʈ�� �����Ͽ� ��Ȯ�� ���.
+

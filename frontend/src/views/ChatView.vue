@@ -3,6 +3,7 @@
     <div class="toolbar">
       <el-switch v-model="dryRun" active-text="Dry Run" inactive-text="Execute" />
       <el-switch v-model="streaming" active-text="Streaming" />
+      <el-switch v-model="useLLM" active-text="LLM" />
       <el-input-number v-model="limit" :min="1" :max="5000" :step="50" size="small" />
       <el-button size="small" @click="clear">지우기</el-button>
     </div>
@@ -34,6 +35,7 @@ const dryRun = ref(true)
 const limit = ref(100)
 const lastResult = computed(() => current.value.lastResult)
 const streaming = ref(true)
+const useLLM = ref(false)
 
 function scrollToBottom() {
   nextTick(() => {
@@ -53,6 +55,7 @@ async function onSend(text: string) {
       url.searchParams.set('q', text)
       url.searchParams.set('limit', String(limit.value))
       url.searchParams.set('dry_run', String(dryRun.value))
+      if (useLLM.value) url.searchParams.set('use_llm', 'true')
       const es = new EventSource(url.toString())
       es.addEventListener('nlu', (ev: MessageEvent) => {
         const data = JSON.parse(ev.data)
@@ -84,7 +87,7 @@ async function onSend(text: string) {
       const r = await fetch(`${base}/api/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: text, dry_run: dryRun.value, limit: limit.value })
+        body: JSON.stringify({ q: text, dry_run: dryRun.value, limit: limit.value, use_llm: useLLM.value })
       })
       if (!r.ok) throw new Error(await r.text())
       const body = await r.json()
