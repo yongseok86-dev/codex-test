@@ -18,6 +18,7 @@ class QueryRequest(BaseModel):
     limit: int | None = 100
     dry_run: bool | None = None
     use_llm: bool | None = None
+    llm_provider: str | None = None  # 'openai' | 'claude' | 'gemini'
 
 
 class QueryResponse(BaseModel):
@@ -39,7 +40,7 @@ async def query(req: QueryRequest) -> QueryResponse:
     # 3) SQL Generation (LLM or rule-based)
     if req.use_llm:
         try:
-            sql = generate_sql_via_llm(req.q)
+            sql = generate_sql_via_llm(req.q, provider=req.llm_provider)
         except LLMNotConfigured as e:
             raise HTTPException(status_code=400, detail=str(e))
     else:
@@ -60,7 +61,7 @@ async def query(req: QueryRequest) -> QueryResponse:
 
 
 @router.get("/query/stream")
-async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = None, use_llm: bool | None = None):
+async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = None, use_llm: bool | None = None, llm_provider: str | None = None):
     async def event_gen():
         def sse(event: str, data: dict):
             payload = json.dumps(data, ensure_ascii=False)
@@ -78,8 +79,8 @@ async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = N
 
         if use_llm:
             try:
-                sql = generate_sql_via_llm(q)
-                yield sse("sql", {"sql": sql, "source": "llm"})
+                sql = generate_sql_via_llm(q, provider=llm_provider)
+                yield sse("sql", {"sql": sql, "source": "llm", "provider": llm_provider or ""})
             except Exception as e:
                 yield sse("validated", {"ok": False, "error": f"LLM error: {e}"})
                 return

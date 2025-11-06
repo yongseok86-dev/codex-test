@@ -25,11 +25,11 @@ class LLMNotConfigured(Exception):
     pass
 
 
-def generate_sql_via_llm(question: str) -> str:
+def generate_sql_via_llm(question: str, provider: Optional[str] = None) -> str:
     semantic = load_semantic_root()
     prompt = prompt_builder.build_sql_prompt(question, semantic)
 
-    provider = (settings.llm_provider or "").lower()
+    provider = (provider or settings.llm_provider or "").lower()
     if provider == "openai":
         if OpenAI is None or not settings.openai_api_key:
             raise LLMNotConfigured("OpenAI provider not available or missing API key")
