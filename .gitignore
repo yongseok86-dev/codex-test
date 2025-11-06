@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+
+# Build artifacts
+dist/
+build/
+out/
+coverage/
+.pytest_cache/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Env and local config
+.env
+.env.*
+.DS_Store
+.idea/
+.vscode/
+.cache/
+
+# Logs
+*.log
+
