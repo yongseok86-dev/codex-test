@@ -6,21 +6,28 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { marked } from 'marked'
-import hljs from 'highlight.js'
 
 const props = defineProps<{ role: 'user' | 'assistant' | 'system', content: string }>()
 
-marked.setOptions({
-  highlight(code, lang) {
-    if (lang && hljs.getLanguage(lang)) {
-      return hljs.highlight(code, { language: lang }).value
-    }
-    return hljs.highlightAuto(code).value
-  }
-})
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'} as any)[c])
+}
 
-const rendered = computed(() => marked.parse(props.content))
+function renderSimpleMarkdown(src: string): string {
+  // very small renderer: code fences + line breaks
+  const parts = src.split(/```/)
+  let html = ''
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 1) {
+      html += `<pre><code>${escapeHtml(parts[i])}</code></pre>`
+    } else {
+      html += escapeHtml(parts[i]).replace(/\n/g, '<br/>')
+    }
+  }
+  return html
+}
+
+const rendered = computed(() => renderSimpleMarkdown(props.content))
 </script>
 
 <style scoped>
@@ -32,4 +39,3 @@ const rendered = computed(() => marked.parse(props.content))
 .system .bubble { background: #f3f4f6; }
 pre { background: #111827; color: #e5e7eb; padding: 10px; border-radius: 8px; overflow: auto; }
 </style>
-
