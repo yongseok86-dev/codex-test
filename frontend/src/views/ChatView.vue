@@ -19,7 +19,7 @@
   </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, computed } from 'vue'
 import ChatMessage from '../components/ChatMessage.vue'
 import ChatInput from '../components/ChatInput.vue'
 import ResultPanel from '../components/ResultPanel.vue'
