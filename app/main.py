@@ -2,9 +2,12 @@ from fastapi import FastAPI, Request
 from time import perf_counter
 
 from app.routers import health, query
+from app.deps import setup_logging, get_logger
 
 
 def create_app() -> FastAPI:
+    # Initialize global logging so console logs also go to file if configured
+    setup_logging()
     app = FastAPI(title="NL2SQL Agent", version="0.0.1")
 
     # Routers
@@ -18,7 +21,8 @@ def create_app() -> FastAPI:
         dt = perf_counter() - t0
         # Minimal logging to keep dependencies light in scaffold
         try:
-            app.logger.info(
+            logger = get_logger("app.http")
+            logger.info(
                 "access",
                 extra={
                     "path": request.url.path,
@@ -34,4 +38,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
