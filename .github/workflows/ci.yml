@@ -8,7 +8,7 @@ on:
 
 jobs:
   node:
-    if: ${{ hashFiles('frontend/package.json') != '' }}
+    if: hashFiles('frontend/package.json') != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,12 +16,12 @@ jobs:
         with:
           node-version: 'lts/*'
           cache: 'npm'
-      - run: npm ci --ignore-scripts
-      - run: npm test --if-present
-      - run: npm run build --if-present
+      - run: npm ci --ignore-scripts --prefix frontend
+      - run: npm test --if-present --prefix frontend
+      - run: npm run build --if-present --prefix frontend
 
   python:
-    if: ${{ hashFiles('pyproject.toml') != '' || hashFiles('requirements.txt') != '' }}
+    if: hashFiles('pyproject.toml') != '' || hashFiles('requirements.txt') != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,4 +36,3 @@ jobs:
       - name: Run tests (pytest if present)
         run: |
           if command -v pytest >/dev/null 2>&1; then pytest -q || exit 1; else echo "pytest not found, skipping"; fi
-
