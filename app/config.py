@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     llm_system_prompt: str | None = (
         "You are an expert data analyst. Generate ONLY BigQuery SQL inside a code fence."
     )
+    # LLM usage toggles
+    llm_enable_repair: bool = True
+    llm_repair_max_attempts: int = 1
+    llm_enable_result_summary: bool = False
     # Materialization
     bq_materialize_dataset: str | None = None  # e.g., project.dataset
     bq_materialize_expiration_hours: int = 24

@@ -68,6 +68,22 @@ async def query(req: QueryRequest) -> QueryResponse:
     # 4) Guardrails/Validation (lint + pipeline)
     validator.ensure_safe(sql)
     report = run_pipeline(sql, perform_execute=False, plan=plan)
+    # If validation failed and LLM allowed, try one repair
+    failed = next((s for s in report.steps if not s.ok), None)
+    repaired = None
+    if failed and req.use_llm and settings.llm_enable_repair:
+        from app.services import repair
+        fixed = repair.attempt_repair(norm_q, sql, failed.message, req.llm_provider)
+        if fixed and fixed != sql:
+            try:
+                validator.ensure_safe(fixed)
+                r2 = run_pipeline(fixed, perform_execute=False, plan=plan)
+                if all(s.ok for s in r2.steps):
+                    repaired = {"original_sql": sql, "fixed_sql": fixed, "failed_step": failed.name}
+                    sql = fixed
+                    report = r2
+            except Exception:
+                pass
 
     # 5) Execute (or DRY RUN) — after validations
     dry = settings.dry_run_only if req.dry_run is None else req.dry_run
@@ -77,7 +93,25 @@ async def query(req: QueryRequest) -> QueryResponse:
         if req.materialize:
             result = await executor.materialize(sql)
         else:
-            result = await executor.run(sql, dry_run=False)
+            try:
+                result = await executor.run(sql, dry_run=False)
+            except Exception as e:
+                # Try a repair loop on execution error
+                if req.use_llm and settings.llm_enable_repair and settings.llm_repair_max_attempts > 0:
+                    from app.services import repair
+                    fixed = repair.attempt_repair(norm_q, sql, str(e), req.llm_provider)
+                    if fixed and fixed != sql:
+                        try:
+                            validator.ensure_safe(fixed)
+                            r2 = run_pipeline(fixed, perform_execute=False, plan=plan)
+                            if all(s.ok for s in r2.steps):
+                                sql = fixed
+                                report = r2
+                                result = await executor.run(sql, dry_run=False)
+                        except Exception:
+                            raise e
+                else:
+                    raise e
 
     logger.info(
         "query_executed",
@@ -88,9 +122,15 @@ async def query(req: QueryRequest) -> QueryResponse:
     meta["validation_steps"] = [s.__dict__ for s in report.steps]
     meta["linking"] = linking_info
     meta["normalized"] = norm_meta
+    if repaired:
+        meta["repair"] = repaired
     # Optional summary
     from app.services import summarize
     meta["summary"] = summarize.summarize(result.rows, meta)
+    if settings.llm_enable_result_summary and req.use_llm:
+        llm_sum = summarize.summarize_llm(norm_q, sql, meta, provider=req.llm_provider)
+        if llm_sum:
+            meta["nl_summary"] = llm_sum
 
     # Update context
     context.update_context(req.conversation_id or "", {"last_sql": sql, "last_plan": plan})
