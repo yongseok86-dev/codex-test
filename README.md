@@ -320,7 +320,7 @@ sequenceDiagram
     participant UI as Result Panel
 
     U->>FE: 자연어 질의 입력
-    FE->>API: POST /api/query {q, conversation_id, use_llm, llm_provider, dry_run, limit, materialize}\n or GET /api/query/stream...
+    FE->>API: POST /api/query {q, conv_id, use_llm, provider, dry_run, limit} / GET /api/query/stream
     API->>NX: normalize(q)
     NX-->>API: q_norm, meta
     API->>CTX: load(conversation_id)
@@ -329,9 +329,9 @@ sequenceDiagram
     NLU-->>API: intent, slots
     API->>PL: make_plan(intent, slots)
     PL-->>API: plan
-    API->>CAT: load_catalog()
+    API->>CAT: load catalog
     CAT-->>API: tables/columns
-    API->>LINK: schema_link(q_norm)
+    API->>LINK: schema linking
     LINK-->>API: candidates, confidence
 
     alt use_llm == true
