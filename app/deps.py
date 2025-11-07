@@ -1,5 +1,8 @@
 import logging
+import os
 from typing import Optional
+from logging.handlers import RotatingFileHandler
+from app.config import settings
 
 try:
     from google.cloud.logging_v2.handlers import StructuredLogHandler
@@ -23,5 +26,26 @@ def get_logger(name: str = "app", level: int = logging.INFO) -> logging.Logger:
         logger.setLevel(level)
         logger.addHandler(handler)
         logger.propagate = False
-    return logger
 
+        # Optional file logger
+        if settings.log_file_path:
+            try:
+                os.makedirs(os.path.dirname(settings.log_file_path), exist_ok=True)
+            except Exception:
+                pass
+            try:
+                file_handler = RotatingFileHandler(
+                    settings.log_file_path,
+                    maxBytes=getattr(settings, "log_max_bytes", 5_000_000),
+                    backupCount=getattr(settings, "log_backup_count", 5),
+                    encoding="utf-8",
+                )
+                file_handler.setLevel(level)
+                file_handler.setFormatter(
+                    logging.Formatter(fmt="%(asctime)s %(levelname)s %(name)s %(message)s")
+                )
+                logger.addHandler(file_handler)
+            except Exception:
+                # Fallback silently if file handler cannot be created
+                pass
+    return logger

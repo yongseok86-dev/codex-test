@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     # Materialization
     bq_materialize_dataset: str | None = None  # e.g., project.dataset
     bq_materialize_expiration_hours: int = 24
+    # Logging to file (optional)
+    log_file_path: str | None = None  # e.g., "logs/app.log" to enable
+    log_max_bytes: int = 5_000_000
+    log_backup_count: int = 5
 
     class Config:
         env_file = ".env"
