@@ -5,7 +5,7 @@ from httpx import AsyncClient, Timeout
 
 async def main():
     params = {
-        "q": "디바이스별 시간대별 방문자 수",
+        "q": "시간대별 페이지별 방문자 수",
         "limit": 10,
         "dry_run": True,
         "use_llm": False,
