@@ -1,168 +1,168 @@
-ï»¿# codex-test
+# codex-test
 
-NLâ†’SQL BigQuery ì‹œë©˜í‹± ë ˆì´ì–´ ì—ì´ì „íŠ¸ + ChatGPT ìŠ¤íƒ€ì¼ í”„ëŸ°íŠ¸ì—”ë“œ.
-FastAPI(ë°±ì—”ë“œ)ì™€ Vite+Vue3(í”„ëŸ°íŠ¸ì—”ë“œ)ë¡œ êµ¬ì„±ë˜ì–´ ìžì—°ì–´ ì§ˆì˜ë¥¼ SQLë¡œ ë³€í™˜í•˜ê³  ì‹¤í–‰/ìš”ì•½ì„ ì§€ì›í•©ë‹ˆë‹¤.
+NL¡æSQL BigQuery ½Ã¸àÆ½ ·¹ÀÌ¾î ¿¡ÀÌÀüÆ® + ChatGPT ½ºÅ¸ÀÏ ÇÁ·±Æ®¿£µå.
+FastAPI(¹é¿£µå)¿Í Vite+Vue3(ÇÁ·±Æ®¿£µå)·Î ±¸¼ºµÇ¾î ÀÚ¿¬¾î ÁúÀÇ¸¦ SQL·Î º¯È¯ÇÏ°í ½ÇÇà/¿ä¾àÀ» Áö¿øÇÕ´Ï´Ù.
 
-## í”„ë¡œì íŠ¸ êµ¬ì„±
-- `app/` ë°±ì—”ë“œ FastAPI
-  - `routers/` API ë¼ìš°íŠ¸ (`health.py`, `query.py` ë“±)
-  - `services/` ì½”ì–´ ë¡œì§ (NLU/Planner/SQLGen/Validator/Executor/LLM/Prompt)
-  - `semantic/` ì‹œë©˜í‹± ëª¨ë¸ (`semantic.yml`, `metrics_definitions.yaml`, `golden_queries.yaml`)
-  - `guardrails.json` ê°€ë“œë ˆì¼ ì •ì±…(ê¸ˆì¹™ì–´ ë“±)
-- `frontend/` Vite + Vue3 UI (ChatGPT ìœ ì‚¬ ì¸í„°ëž™ì…˜)
-- `tests/` PyTest ê¸°ë³¸ í…ŒìŠ¤íŠ¸
-- `.github/` CI, PR í…œí”Œë¦¿, CODEOWNERS
+## ÇÁ·ÎÁ§Æ® ±¸¼º
+- `app/` ¹é¿£µå FastAPI
+  - `routers/` API ¶ó¿ìÆ® (`health.py`, `query.py` µî)
+  - `services/` ÄÚ¾î ·ÎÁ÷ (NLU/Planner/SQLGen/Validator/Executor/LLM/Prompt)
+  - `semantic/` ½Ã¸àÆ½ ¸ðµ¨ (`semantic.yml`, `metrics_definitions.yaml`, `golden_queries.yaml`)
+  - `guardrails.json` °¡µå·¹ÀÏ Á¤Ã¥(±ÝÄ¢¾î µî)
+- `frontend/` Vite + Vue3 UI (ChatGPT À¯»ç ÀÎÅÍ·¢¼Ç)
+- `tests/` PyTest ±âº» Å×½ºÆ®
+- `.github/` CI, PR ÅÛÇÃ¸´, CODEOWNERS
 
-## ë°±ì—”ë“œ(FastAPI)
-- ì‹¤í–‰: `uvicorn app.main:app --host 0.0.0.0 --port 8080`
+## ¹é¿£µå(FastAPI)
+- ½ÇÇà: `uvicorn app.main:app --host 0.0.0.0 --port 8080`
 - API:
   - `GET /healthz`, `GET /readyz`
   - `POST /api/query` { q, limit?, dry_run?, use_llm? }
-  - `GET /api/query/stream?q=...&limit=...&dry_run=...&use_llm=...` (SSE: nlu â†’ plan â†’ sql â†’ validated â†’ result)
+  - `GET /api/query/stream?q=...&limit=...&dry_run=...&use_llm=...` (SSE: nlu ¡æ plan ¡æ sql ¡æ validated ¡æ result)
 - BigQuery:
-  - ê¸°ë³¸ì€ ë“œë¼ì´ëŸ°(`dry_run_only=true`)ìœ¼ë¡œ ë¹„ìš©/ì•ˆì „ ë³´ìž¥
-  - ì‹¤ì œ ì‹¤í–‰ ì‹œ GCP ì¸ì¦ê³¼ `gcp_project`, `bq_default_location` í•„ìš”
-  - DRY RUN ë©”íƒ€: `total_bytes_processed`, `estimated_tb`, `estimated_cost_usd`
-- ê°€ë“œë ˆì¼: `app/guardrails.json` ê¸°ì¤€ìœ¼ë¡œ ê¸ˆì¹™ì–´ ê²€ì‚¬(SELECT * ë“±)
+  - ±âº»Àº µå¶óÀÌ·±(`dry_run_only=true`)À¸·Î ºñ¿ë/¾ÈÀü º¸Àå
+  - ½ÇÁ¦ ½ÇÇà ½Ã GCP ÀÎÁõ°ú `gcp_project`, `bq_default_location` ÇÊ¿ä
+  - DRY RUN ¸ÞÅ¸: `total_bytes_processed`, `estimated_tb`, `estimated_cost_usd`
+- °¡µå·¹ÀÏ: `app/guardrails.json` ±âÁØÀ¸·Î ±ÝÄ¢¾î °Ë»ç(SELECT * µî)
 
-## LLM ì„¤ì •(OpenAI ê¸°ë³¸, Claude/Gemini ì§€ì›)
-- `.env` ì˜ˆì‹œ(ë£¨íŠ¸ì˜ `.env.example` ì°¸ì¡°):
+## LLM ¼³Á¤(OpenAI ±âº», Claude/Gemini Áö¿ø)
+- `.env` ¿¹½Ã(·çÆ®ÀÇ `.env.example` ÂüÁ¶):
   - `llm_provider=openai | claude | gemini`
-  - OpenAI: `openai_api_key`, `openai_model`(ê¸°ë³¸ gpt-4o-mini)
+  - OpenAI: `openai_api_key`, `openai_model`(±âº» gpt-4o-mini)
   - Claude: `anthropic_api_key`, `anthropic_model`
   - Gemini: `gemini_api_key`, `gemini_model`
-- í”„ë¡¬í”„íŠ¸ì— ì‹œë©˜í‹± ë ˆì´ì–´/ë©”íŠ¸ë¦­/ì‚¬ì „ì„ ì£¼ìž…í•˜ì—¬ SQL ì •í™•ë„ í–¥ìƒ
+- ÇÁ·ÒÇÁÆ®¿¡ ½Ã¸àÆ½ ·¹ÀÌ¾î/¸ÞÆ®¸¯/»çÀüÀ» ÁÖÀÔÇÏ¿© SQL Á¤È®µµ Çâ»ó
 
-## í”„ëŸ°íŠ¸ì—”ë“œ(Vite + Vue3)
-- ì„¤ì¹˜/ì‹¤í–‰: `cd frontend && npm ci && npm run dev` (http://localhost:5173)
-- ê°œë°œ í”„ë¡ì‹œ: `/api` â†’ `http://localhost:8080` (`vite.config.ts`)
-- ê¸°ëŠ¥:
-  - ChatGPT ìŠ¤íƒ€ì¼ ëŒ€í™”, ìŠ¤íŠ¸ë¦¬ë° ì§„í–‰(SSE), LLM í† ê¸€, Dry Run/Limit ì œì–´
-  - ê²°ê³¼ íŒ¨ë„(íŽ˜ì´ì§€ë„¤ì´ì…˜/CSV ë‹¤ìš´ë¡œë“œ), ë‹¤í¬ ëª¨ë“œ
-  - ê³ ê¸‰ ë§ˆí¬ë‹¤ìš´(ëª©ë¡/í‘œ) + ì½”ë“œ í•˜ì´ë¼ì´íŠ¸ + ìˆ˜ì‹(KaTeX) + ë‹¤ì´ì–´ê·¸ëž¨(Mermaid)
+## ÇÁ·±Æ®¿£µå(Vite + Vue3)
+- ¼³Ä¡/½ÇÇà: `cd frontend && npm ci && npm run dev` (http://localhost:5173)
+- °³¹ß ÇÁ·Ï½Ã: `/api` ¡æ `http://localhost:8080` (`vite.config.ts`)
+- ±â´É:
+  - ChatGPT ½ºÅ¸ÀÏ ´ëÈ­, ½ºÆ®¸®¹Ö ÁøÇà(SSE), LLM Åä±Û, Dry Run/Limit Á¦¾î
+  - °á°ú ÆÐ³Î(ÆäÀÌÁö³×ÀÌ¼Ç/CSV ´Ù¿î·Îµå), ´ÙÅ© ¸ðµå
+  - °í±Þ ¸¶Å©´Ù¿î(¸ñ·Ï/Ç¥) + ÄÚµå ÇÏÀÌ¶óÀÌÆ® + ¼ö½Ä(KaTeX) + ´ÙÀÌ¾î±×·¥(Mermaid)
 
-## í…ŒìŠ¤íŠ¸
+## Å×½ºÆ®
 - `pytest -q`
 
-## í™˜ê²½ í…œí”Œë¦¿
-- ë£¨íŠ¸ì˜ `.env.example`ë¥¼ ë³µì‚¬í•´ `.env`ë¡œ ì‚¬ìš©í•˜ì„¸ìš”. GCP/BigQuery ë° LLM(openai/claude/gemini) í‚¤ë¥¼ ì±„ìš´ ë’¤ ì„œë²„ë¥¼ ìž¬ì‹œìž‘í•˜ë©´ ì ìš©ë©ë‹ˆë‹¤.
+## È¯°æ ÅÛÇÃ¸´
+- ·çÆ®ÀÇ `.env.example`¸¦ º¹»çÇØ `.env`·Î »ç¿ëÇÏ¼¼¿ä. GCP/BigQuery ¹× LLM(openai/claude/gemini) Å°¸¦ Ã¤¿î µÚ ¼­¹ö¸¦ Àç½ÃÀÛÇÏ¸é Àû¿ëµË´Ï´Ù.
 
-- LLM ì„ íƒ: í”„ëŸ°íŠ¸ì—”ë“œì—ì„œ Provider(OpenAI/Claude/Gemini)ë§Œ ì„ íƒí•©ë‹ˆë‹¤. í‚¤/í† í°/íŠœë‹(ì˜¨ë„, í† í°)ì€ ë°±ì—”ë“œ .env ì„¤ì •ìœ¼ë¡œ ê´€ë¦¬í•˜ë©°, ì œê³µìž í˜¸ì¶œ ì‹¤íŒ¨ ì‹œ ì„œë²„ ë¡œê·¸ì— ê²½ê³ ë¥¼ ë‚¨ê¸°ê³  ê·œì¹™ ê¸°ë°˜ SQLë¡œ ìžë™ í´ë°±í•©ë‹ˆë‹¤.
+- LLM ¼±ÅÃ: ÇÁ·±Æ®¿£µå¿¡¼­ Provider(OpenAI/Claude/Gemini)¸¸ ¼±ÅÃÇÕ´Ï´Ù. Å°/ÅäÅ«/Æ©´×(¿Âµµ, ÅäÅ«)Àº ¹é¿£µå .env ¼³Á¤À¸·Î °ü¸®ÇÏ¸ç, Á¦°øÀÚ È£Ãâ ½ÇÆÐ ½Ã ¼­¹ö ·Î±×¿¡ °æ°í¸¦ ³²±â°í ±ÔÄ¢ ±â¹Ý SQL·Î ÀÚµ¿ Æú¹éÇÕ´Ï´Ù.
 
 
-- ê²€ì¦ íë¦„: ê·œì¹™ ë¦°íŒ… â†’ DRY RUN â†’ EXPLAIN â†’ LIMIT 0 ìŠ¤í‚¤ë§ˆ â†’ ì¹´ë‚˜ë¦¬ì•„ â†’ ë„ë©”ì¸ ê·œì¹™ â†’ ì „ì²´ ì‹¤í–‰/ë¨¸í‹°ë·°.
+- °ËÁõ Èå¸§: ±ÔÄ¢ ¸°ÆÃ ¡æ DRY RUN ¡æ EXPLAIN ¡æ LIMIT 0 ½ºÅ°¸¶ ¡æ Ä«³ª¸®¾Æ ¡æ µµ¸ÞÀÎ ±ÔÄ¢ ¡æ ÀüÃ¼ ½ÇÇà/¸ÓÆ¼ºä.
 
-- ì‹¤í–‰ ì˜µì…˜: REST ë°”ë”” `materialize: true` ë¡œ ê²°ê³¼ë¥¼ BigQuery í…Œì´ë¸”ë¡œ ë¨¸í‹°ë¦¬ì–¼ë¼ì´ì¦ˆ(ë§Œë£Œì‹œê°„ ê¸°ë³¸ 24h, .env ì„¤ì •).
+- ½ÇÇà ¿É¼Ç: REST ¹Ùµð `materialize: true` ·Î °á°ú¸¦ BigQuery Å×ÀÌºí·Î ¸ÓÆ¼¸®¾ó¶óÀÌÁî(¸¸·á½Ã°£ ±âº» 24h, .env ¼³Á¤).
 
-- ì‹œë©˜í‹± í…Œì´ë¸” ê²½ë¡œ ì˜¤ë²„ë¼ì´ë“œ: `app/semantic/datasets.yaml`ì— ì—”í‹°í‹°ë³„ BigQuery í…Œì´ë¸”ì„ ë§¤í•‘í•˜ë©´ í”„ë¡¬í”„íŠ¸ì™€ ê²€ì¦ì—ì„œ í•´ë‹¹ ê²½ë¡œë¡œ ì‚¬ìš©ë©ë‹ˆë‹¤.
+- ½Ã¸àÆ½ Å×ÀÌºí °æ·Î ¿À¹ö¶óÀÌµå: `app/semantic/datasets.yaml`¿¡ ¿£Æ¼Æ¼º° BigQuery Å×ÀÌºíÀ» ¸ÅÇÎÇÏ¸é ÇÁ·ÒÇÁÆ®¿Í °ËÁõ¿¡¼­ ÇØ´ç °æ·Î·Î »ç¿ëµË´Ï´Ù.
 
-- LLM í”„ë¡¬í”„íŠ¸ì˜ few-shot: golden_queries.yamlì—ì„œ ìžì—°ì–´ ìœ ì‚¬ë„ê°€ ë†’ì€ ì˜ˆì‹œ(NL/intent/slots)ë¥¼ ìžë™ í¬í•¨í•´ SQL í’ˆì§ˆì„ ë†’ìž…ë‹ˆë‹¤.
-## í”„ë¡œì íŠ¸ í´ë”/íŒŒì¼ êµ¬ì„±
+- LLM ÇÁ·ÒÇÁÆ®ÀÇ few-shot: golden_queries.yaml¿¡¼­ ÀÚ¿¬¾î À¯»çµµ°¡ ³ôÀº ¿¹½Ã(NL/intent/slots)¸¦ ÀÚµ¿ Æ÷ÇÔÇØ SQL Ç°ÁúÀ» ³ôÀÔ´Ï´Ù.
+## ÇÁ·ÎÁ§Æ® Æú´õ/ÆÄÀÏ ±¸¼º
 ```
 .
-â”œâ”€ app/
-â”‚  â”œâ”€ bq/connector.py            # BigQuery í´ë¼ì´ì–¸íŠ¸/QueryJobConfig í—¬í¼
-â”‚  â”œâ”€ config.py                  # Settings(.env): GCP/LLM/ë¨¸í‹°ë¦¬ì–¼ë¼ì´ì¦ˆ/íŠœë‹
-â”‚  â”œâ”€ deps.py                    # get_logger()
-â”‚  â”œâ”€ main.py                    # FastAPI ì•± íŒ©í† ë¦¬/ë¯¸ë“¤ì›¨ì–´
-â”‚  â”œâ”€ routers/
-â”‚  â”‚  â”œâ”€ health.py               # /healthz, /readyz
-â”‚  â”‚  â””â”€ query.py                # /api/query, /api/query/stream (SSE)
-â”‚  â”œâ”€ semantic/
-â”‚  â”‚  â”œâ”€ semantic.yml            # ì—”í‹°í‹°/ì°¨ì›/ì§€í‘œ/ì–´íœ˜
-â”‚  â”‚  â”œâ”€ metrics_definitions.yaml# ë©”íŠ¸ë¦­ ì •ì˜+ê¸°ë³¸í•„í„°
-â”‚  â”‚  â”œâ”€ golden_queries.yaml     # í•œêµ­ì–´ ê³¨ë“ ì¿¼ë¦¬
-â”‚  â”‚  â”œâ”€ datasets.yaml           # ì—”í‹°í‹°â†’BQ í…Œì´ë¸” ë§¤í•‘
-â”‚  â”‚  â””â”€ loader.py               # ì‹œë©˜í‹± ë¡œë”/ì˜¤ë²„ë¼ì´ë“œ ì ìš©
-â”‚  â”œâ”€ services/
-â”‚  â”‚  â”œâ”€ nlu.py                  # extract()
-â”‚  â”‚  â”œâ”€ planner.py              # make_plan()
-â”‚  â”‚  â”œâ”€ sqlgen.py               # generate() ê·œì¹™ê¸°ë°˜ SQL
-â”‚  â”‚  â”œâ”€ validator.py            # ensure_safe(), lint()
-â”‚  â”‚  â”œâ”€ validation.py           # lintâ†’dry_runâ†’explainâ†’schemaâ†’canaryâ†’assertions
-â”‚  â”‚  â”œâ”€ executor.py             # run(), materialize()
-â”‚  â”‚  â”œâ”€ prompt.py               # build_sql_prompt() + few-shot
-â”‚  â”‚  â””â”€ llm.py                  # generate_sql_via_llm()
-â”‚  â””â”€ utils/timeparse.py         # last_n_days_utc()
-â”œâ”€ frontend/
-â”‚  â”œâ”€ index.html
-â”‚  â”œâ”€ vite.config.ts             # /api í”„ë¡ì‹œ
-â”‚  â”œâ”€ package.json
-â”‚  â””â”€ src/
-â”‚     â”œâ”€ App.vue                 # ë ˆì´ì•„ì›ƒ/ë‹¤í¬ëª¨ë“œ/ížˆìŠ¤í† ë¦¬
-â”‚     â”œâ”€ main.ts                 # ë¶€íŠ¸ìŠ¤íŠ¸ëž©(CSS í¬í•¨)
-â”‚     â”œâ”€ views/ChatView.vue      # ìŠ¤íŠ¸ë¦¬ë°/LLM í† ê¸€/ì „ì†¡ ë¡œì§
-â”‚     â”œâ”€ components/
-â”‚     â”‚  â”œâ”€ ChatInput.vue        # ìž…ë ¥/ì „ì†¡
-â”‚     â”‚  â”œâ”€ ChatMessage.vue      # MD/KaTeX/Mermaid ë Œë”
-â”‚     â”‚  â””â”€ ResultPanel.vue      # í…Œì´ë¸”/íŽ˜ì´ì§€ë„¤ì´ì…˜/CSV
-â”‚     â””â”€ store/chat.ts           # ëŒ€í™” ì €ìž¥/ë³µì›
-â”œâ”€ tests/                        # ê¸°ë³¸ í…ŒìŠ¤íŠ¸
-â”œâ”€ .github/                      # CI/PR/CODEOWNERS
-â””â”€ AGENTS.md, README.md, .env.example
+¦§¦¡ app/
+¦¢  ¦§¦¡ bq/connector.py            # BigQuery Å¬¶óÀÌ¾ðÆ®/QueryJobConfig ÇïÆÛ
+¦¢  ¦§¦¡ config.py                  # Settings(.env): GCP/LLM/¸ÓÆ¼¸®¾ó¶óÀÌÁî/Æ©´×
+¦¢  ¦§¦¡ deps.py                    # get_logger()
+¦¢  ¦§¦¡ main.py                    # FastAPI ¾Û ÆÑÅä¸®/¹Ìµé¿þ¾î
+¦¢  ¦§¦¡ routers/
+¦¢  ¦¢  ¦§¦¡ health.py               # /healthz, /readyz
+¦¢  ¦¢  ¦¦¦¡ query.py                # /api/query, /api/query/stream (SSE)
+¦¢  ¦§¦¡ semantic/
+¦¢  ¦¢  ¦§¦¡ semantic.yml            # ¿£Æ¼Æ¼/Â÷¿ø/ÁöÇ¥/¾îÈÖ
+¦¢  ¦¢  ¦§¦¡ metrics_definitions.yaml# ¸ÞÆ®¸¯ Á¤ÀÇ+±âº»ÇÊÅÍ
+¦¢  ¦¢  ¦§¦¡ golden_queries.yaml     # ÇÑ±¹¾î °ñµçÄõ¸®
+¦¢  ¦¢  ¦§¦¡ datasets.yaml           # ¿£Æ¼Æ¼¡æBQ Å×ÀÌºí ¸ÅÇÎ
+¦¢  ¦¢  ¦¦¦¡ loader.py               # ½Ã¸àÆ½ ·Î´õ/¿À¹ö¶óÀÌµå Àû¿ë
+¦¢  ¦§¦¡ services/
+¦¢  ¦¢  ¦§¦¡ nlu.py                  # extract()
+¦¢  ¦¢  ¦§¦¡ planner.py              # make_plan()
+¦¢  ¦¢  ¦§¦¡ sqlgen.py               # generate() ±ÔÄ¢±â¹Ý SQL
+¦¢  ¦¢  ¦§¦¡ validator.py            # ensure_safe(), lint()
+¦¢  ¦¢  ¦§¦¡ validation.py           # lint¡ædry_run¡æexplain¡æschema¡æcanary¡æassertions
+¦¢  ¦¢  ¦§¦¡ executor.py             # run(), materialize()
+¦¢  ¦¢  ¦§¦¡ prompt.py               # build_sql_prompt() + few-shot
+¦¢  ¦¢  ¦¦¦¡ llm.py                  # generate_sql_via_llm()
+¦¢  ¦¦¦¡ utils/timeparse.py         # last_n_days_utc()
+¦§¦¡ frontend/
+¦¢  ¦§¦¡ index.html
+¦¢  ¦§¦¡ vite.config.ts             # /api ÇÁ·Ï½Ã
+¦¢  ¦§¦¡ package.json
+¦¢  ¦¦¦¡ src/
+¦¢     ¦§¦¡ App.vue                 # ·¹ÀÌ¾Æ¿ô/´ÙÅ©¸ðµå/È÷½ºÅä¸®
+¦¢     ¦§¦¡ main.ts                 # ºÎÆ®½ºÆ®·¦(CSS Æ÷ÇÔ)
+¦¢     ¦§¦¡ views/ChatView.vue      # ½ºÆ®¸®¹Ö/LLM Åä±Û/Àü¼Û ·ÎÁ÷
+¦¢     ¦§¦¡ components/
+¦¢     ¦¢  ¦§¦¡ ChatInput.vue        # ÀÔ·Â/Àü¼Û
+¦¢     ¦¢  ¦§¦¡ ChatMessage.vue      # MD/KaTeX/Mermaid ·»´õ
+¦¢     ¦¢  ¦¦¦¡ ResultPanel.vue      # Å×ÀÌºí/ÆäÀÌÁö³×ÀÌ¼Ç/CSV
+¦¢     ¦¦¦¡ store/chat.ts           # ´ëÈ­ ÀúÀå/º¹¿ø
+¦§¦¡ tests/                        # ±âº» Å×½ºÆ®
+¦§¦¡ .github/                      # CI/PR/CODEOWNERS
+¦¦¦¡ AGENTS.md, README.md, .env.example
 ```
 
-## íŒŒì¼ë³„ í•¨ìˆ˜/í´ëž˜ìŠ¤ ê°œìš”(ê°„ë‹¨ ì£¼ì„)
+## ÆÄÀÏº° ÇÔ¼ö/Å¬·¡½º °³¿ä(°£´Ü ÁÖ¼®)
 - app/config.py
-  - class Settings: GCP(BigQuery)/LLM(API Key, ëª¨ë¸, ì˜¨ë„/í† í°/ì‹œìŠ¤í…œí”„ë¡¬í”„íŠ¸)/ë¨¸í‹°ë¦¬ì–¼ë¼ì´ì¦ˆ ì„¤ì •
+  - class Settings: GCP(BigQuery)/LLM(API Key, ¸ðµ¨, ¿Âµµ/ÅäÅ«/½Ã½ºÅÛÇÁ·ÒÇÁÆ®)/¸ÓÆ¼¸®¾ó¶óÀÌÁî ¼³Á¤
 - app/deps.py
-  - get_logger(name, level): êµ¬ì¡°í™”/ìŠ¤íŠ¸ë¦¼ ë¡œê±° ìƒì„±
+  - get_logger(name, level): ±¸Á¶È­/½ºÆ®¸² ·Î°Å »ý¼º
 - app/main.py
-  - create_app(): FastAPI ì•± êµ¬ì„±, ë¼ìš°í„°/ë¯¸ë“¤ì›¨ì–´ ë“±ë¡
+  - create_app(): FastAPI ¾Û ±¸¼º, ¶ó¿ìÅÍ/¹Ìµé¿þ¾î µî·Ï
 - app/routers/health.py
-  - healthz(), readyz(): ìƒíƒœ ì ê²€ ì—”ë“œí¬ì¸íŠ¸
+  - healthz(), readyz(): »óÅÂ Á¡°Ë ¿£µåÆ÷ÀÎÆ®
 - app/routers/query.py
-  - class QueryRequest/QueryResponse: ìš”ì²­/ì‘ë‹µ ëª¨ë¸
-  - query(req): NLUâ†’Planâ†’SQL(LLM/ê·œì¹™)â†’ê²€ì¦íŒŒì´í”„ë¼ì¸â†’ì‹¤í–‰/ë¨¸í‹°ë¦¬ì–¼ë¼ì´ì¦ˆ
-  - query_stream(...): ìœ„ íë¦„ì„ SSE ì´ë²¤íŠ¸(nlu/plan/sql/validated/check/result)ë¡œ ìŠ¤íŠ¸ë¦¬ë°
+  - class QueryRequest/QueryResponse: ¿äÃ»/ÀÀ´ä ¸ðµ¨
+  - query(req): NLU¡æPlan¡æSQL(LLM/±ÔÄ¢)¡æ°ËÁõÆÄÀÌÇÁ¶óÀÎ¡æ½ÇÇà/¸ÓÆ¼¸®¾ó¶óÀÌÁî
+  - query_stream(...): À§ Èå¸§À» SSE ÀÌº¥Æ®(nlu/plan/sql/validated/check/result)·Î ½ºÆ®¸®¹Ö
 - app/services/nlu.py
-  - extract(q): ì˜ë„/ìŠ¬ë¡¯(ë©”íŠ¸ë¦­/ê¸°ê°„ ížŒíŠ¸) ì¶”ì¶œ(íœ´ë¦¬ìŠ¤í‹±)
+  - extract(q): ÀÇµµ/½½·Ô(¸ÞÆ®¸¯/±â°£ ÈùÆ®) ÃßÃâ(ÈÞ¸®½ºÆ½)
 - app/services/planner.py
-  - make_plan(intent, slots): ê¸°ë³¸ grain/metric ë³´ì •, ê³„íš ìƒì„±
+  - make_plan(intent, slots): ±âº» grain/metric º¸Á¤, °èÈ¹ »ý¼º
 - app/services/sqlgen.py
-  - generate(plan, limit): BigQuery ë°©ì–¸ ê·œì¹™ ê¸°ë°˜ SQL ìƒì„±
+  - generate(plan, limit): BigQuery ¹æ¾ð ±ÔÄ¢ ±â¹Ý SQL »ý¼º
 - app/services/validator.py
-  - ensure_safe(sql): ë³€í˜•/SELECT * ê¸ˆì§€ ë“± ê°€ë“œë ˆì¼ ê²€ì‚¬
-  - lint(sql): ì‹œê°„í•„í„°/SELECT * ë“± ë¦°íŠ¸ ì´ìŠˆ ë°˜í™˜
+  - ensure_safe(sql): º¯Çü/SELECT * ±ÝÁö µî °¡µå·¹ÀÏ °Ë»ç
+  - lint(sql): ½Ã°£ÇÊÅÍ/SELECT * µî ¸°Æ® ÀÌ½´ ¹ÝÈ¯
 - app/services/validation.py
-  - StepResult, ValidationReport: ë‹¨ê³„ ê²°ê³¼/ë¦¬í¬íŠ¸ ëª¨ë¸
-  - lint_sql(), dry_run(), explain(), schema(), canary(): ë‹¨ê³„ë³„ ê²€ì¦ ìˆ˜í–‰
-  - domain_assertions(sql, plan): ì‹œë©˜í‹±/ë©”íŠ¸ë¦­ ê¸°ë°˜ ë„ë©”ì¸ ê·œì¹™ ê²€ì‚¬
-  - run_pipeline(sql, perform_execute, plan): ê¶Œìž¥ ê²€ì¦ íë¦„ ì‹¤í–‰
+  - StepResult, ValidationReport: ´Ü°è °á°ú/¸®Æ÷Æ® ¸ðµ¨
+  - lint_sql(), dry_run(), explain(), schema(), canary(): ´Ü°èº° °ËÁõ ¼öÇà
+  - domain_assertions(sql, plan): ½Ã¸àÆ½/¸ÞÆ®¸¯ ±â¹Ý µµ¸ÞÀÎ ±ÔÄ¢ °Ë»ç
+  - run_pipeline(sql, perform_execute, plan): ±ÇÀå °ËÁõ Èå¸§ ½ÇÇà
 - app/services/executor.py
-  - class QueryResult: rows/meta ì»¨í…Œì´ë„ˆ
-  - run(sql, dry_run): DRY RUN/ì‹¤í–‰ ë° ë©”íƒ€(ë¹„ìš©ì¶”ì • ë“±) ë°˜í™˜
-  - materialize(sql): ì„¤ì •ëœ ë°ì´í„°ì…‹ì— ê²°ê³¼ í…Œì´ë¸” ìƒì„±(ë§Œë£Œì‹œê°„ ì„¤ì •)
+  - class QueryResult: rows/meta ÄÁÅ×ÀÌ³Ê
+  - run(sql, dry_run): DRY RUN/½ÇÇà ¹× ¸ÞÅ¸(ºñ¿ëÃßÁ¤ µî) ¹ÝÈ¯
+  - materialize(sql): ¼³Á¤µÈ µ¥ÀÌÅÍ¼Â¿¡ °á°ú Å×ÀÌºí »ý¼º(¸¸·á½Ã°£ ¼³Á¤)
 - app/services/prompt.py
-  - build_sql_prompt(question, semantic): ì‹œë©˜í‹±/ë©”íŠ¸ë¦­/ì–´íœ˜+ê³¨ë“ ì¿¼ë¦¬ few-shot í¬í•¨ í”„ë¡¬í”„íŠ¸
+  - build_sql_prompt(question, semantic): ½Ã¸àÆ½/¸ÞÆ®¸¯/¾îÈÖ+°ñµçÄõ¸® few-shot Æ÷ÇÔ ÇÁ·ÒÇÁÆ®
 - app/services/llm.py
-  - generate_sql_via_llm(question, provider): OpenAI/Claude/Geminië¡œ SQL ìƒì„±, ì½”ë“œíŽœìŠ¤ì—ì„œ ì¶”ì¶œ
+  - generate_sql_via_llm(question, provider): OpenAI/Claude/Gemini·Î SQL »ý¼º, ÄÚµåÆæ½º¿¡¼­ ÃßÃâ
 - app/semantic/loader.py
-  - load_semantic_root(): ì‹œë©˜í‹±/ë©”íŠ¸ë¦­/ê³¨ë“ ì¿¼ë¦¬ ë¡œë”©
-  - load_datasets_overrides(): datasets.yaml ì½ê¸°
-  - apply_table_overrides(model, overrides): ì—”í‹°í‹° í…Œì´ë¸” ê²½ë¡œ ì¹˜í™˜
+  - load_semantic_root(): ½Ã¸àÆ½/¸ÞÆ®¸¯/°ñµçÄõ¸® ·Îµù
+  - load_datasets_overrides(): datasets.yaml ÀÐ±â
+  - apply_table_overrides(model, overrides): ¿£Æ¼Æ¼ Å×ÀÌºí °æ·Î Ä¡È¯
 - app/bq/connector.py
-  - available(), client(), base_job_config(), run_query(): BigQuery ì‹¤í–‰ í—¬í¼
+  - available(), client(), base_job_config(), run_query(): BigQuery ½ÇÇà ÇïÆÛ
 - app/utils/timeparse.py
-  - last_n_days_utc(n): ìµœê·¼ nì¼ UTC êµ¬ê°„ ë°˜í™˜
+  - last_n_days_utc(n): ÃÖ±Ù nÀÏ UTC ±¸°£ ¹ÝÈ¯
 - frontend/src/views/ChatView.vue
-  - onSend(text): REST/SSEë¡œ ì§ˆì˜ ì „ì†¡, LLM/ìŠ¤íŠ¸ë¦¬ë°/ë“œë¼ì´ëŸ°/ë¦¬ë°‹ ë°˜ì˜
-  - clear(): ì•ˆë‚´ ë©”ì‹œì§€ ì¶œë ¥(ìƒˆ ì±„íŒ… ìœ ë„)
+  - onSend(text): REST/SSE·Î ÁúÀÇ Àü¼Û, LLM/½ºÆ®¸®¹Ö/µå¶óÀÌ·±/¸®¹Ô ¹Ý¿µ
+  - clear(): ¾È³» ¸Þ½ÃÁö Ãâ·Â(»õ Ã¤ÆÃ À¯µµ)
 - frontend/src/components/ChatMessage.vue
-  - rendered(computed): marked+KaTeX+Mermaid ë Œë”, DOMPurifyë¡œ sanitize
+  - rendered(computed): marked+KaTeX+Mermaid ·»´õ, DOMPurify·Î sanitize
 - frontend/src/components/ResultPanel.vue
-  - columns/paged(computed), downloadCsv(): ê²°ê³¼ í‘œ ë Œë”/CSV ì €ìž¥, íŽ˜ì´ì§€ë„¤ì´ì…˜
+  - columns/paged(computed), downloadCsv(): °á°ú Ç¥ ·»´õ/CSV ÀúÀå, ÆäÀÌÁö³×ÀÌ¼Ç
 - frontend/src/components/ChatInput.vue
-  - emitSend(): ì—”í„°/ë²„íŠ¼ ì „ì†¡
+  - emitSend(): ¿£ÅÍ/¹öÆ° Àü¼Û
 - frontend/src/store/chat.ts
-  - types(Role/Message/Result/Conversation), newConversation(), selectConversation(), addMessage(), setResult(): ë¡œì»¬ìŠ¤í† ë¦¬ì§€ ì €ìž¥/ë³µì›
+  - types(Role/Message/Result/Conversation), newConversation(), selectConversation(), addMessage(), setResult(): ·ÎÄÃ½ºÅä¸®Áö ÀúÀå/º¹¿ø
 ## Sequence Diagram
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant U as User
-    participant FE as Frontend (ChatView)
+    participant FE as Frontend ChatView
     participant API as FastAPI (/api/query | /api/query/stream)
     participant NLU as NLU (extract)
     participant PL as Planner (make_plan)
@@ -174,7 +174,7 @@ sequenceDiagram
     participant EXE as Executor (run/materialize)
     participant UI as Result Panel
 
-    U->>FE: ìžì—°ì–´ ì§ˆì˜ ìž…ë ¥
+    U->>FE: ÀÚ¿¬¾î ÁúÀÇ ÀÔ·Â
     FE->>API: POST /api/query {q, dry_run, limit, use_llm, llm_provider, materialize}\n or GET /api/query/stream...
     API->>NLU: extract(q)
     NLU-->>API: intent, slots
@@ -190,10 +190,10 @@ sequenceDiagram
     end
 
     API->>VAL: ensure_safe(sql)
-    VAL-->>API: ok (or violation â†’ abort)
+    VAL-->>API: ok (or violation ¡æ abort)
 
     API->>PIPE: run_pipeline(sql, plan)
-    PIPE->>VAL: lint(sql) (SELECT * / time filter ë“±)
+    PIPE->>VAL: lint(sql) (SELECT * / time filter µî)
     VAL-->>PIPE: issues
     PIPE->>BQ: DRY RUN (bytes, cost)
     BQ-->>PIPE: total_bytes_processed / errors
@@ -225,10 +225,10 @@ sequenceDiagram
     end
     API-->>FE: JSON { sql, dry_run, rows?, metadata(validation_steps, cost, etc.) }
 
-    FE->>UI: SQL/ë©”íƒ€/í…Œì´ë¸” ì—…ë°ì´íŠ¸(íŽ˜ì´ì§€ë„¤ì´ì…˜/CSV)
-    UI-->>U: ê²°ê³¼ í‘œì‹œ
+    FE->>UI: SQL/¸ÞÅ¸/Å×ÀÌºí ¾÷µ¥ÀÌÆ®(ÆäÀÌÁö³×ÀÌ¼Ç/CSV)
+    UI-->>U: °á°ú Ç¥½Ã
 
-    note over API: LLM ì‹¤íŒ¨ ì‹œ ê²½ê³  ë¡œê·¸ ê¸°ë¡, ê·œì¹™ ê¸°ë°˜ìœ¼ë¡œ í´ë°±
+    note over API: LLM ½ÇÆÐ ½Ã °æ°í ·Î±× ±â·Ï, ±ÔÄ¢ ±â¹ÝÀ¸·Î Æú¹é
 ```
 ## Architecture Overview
 
@@ -300,7 +300,7 @@ flowchart LR
 sequenceDiagram
     autonumber
     participant U as User
-    participant FE as Frontend (ChatView)
+    participant FE as Frontend ChatView
     participant API as FastAPI (/api/query | /api/query/stream)
     participant NX as Normalize (preprocess)
     participant CTX as Context (conversation)
@@ -319,7 +319,7 @@ sequenceDiagram
     participant SUM as Summarize (LLM optional)
     participant UI as Result Panel
 
-    U->>FE: ìžì—°ì–´ ì§ˆì˜ ìž…ë ¥
+    U->>FE: ÀÚ¿¬¾î ÁúÀÇ ÀÔ·Â
     FE->>API: POST /api/query {q, conv_id, use_llm, provider, dry_run, limit} / GET /api/query/stream
     API->>NX: normalize(q)
     NX-->>API: q_norm, meta
@@ -376,8 +376,8 @@ sequenceDiagram
     end
     API-->>FE: JSON { sql, dry_run, rows?, metadata(validation_steps, linking, normalized, cost, summary, nl_summary?) }
 
-    FE->>UI: ê²°ê³¼ íŒ¨ë„ ì—…ë°ì´íŠ¸(íŽ˜ì´ì§€ë„¤ì´ì…˜/CSV)
-    UI-->>U: ê²°ê³¼ í‘œì‹œ
+    FE->>UI: °á°ú ÆÐ³Î ¾÷µ¥ÀÌÆ®(ÆäÀÌÁö³×ÀÌ¼Ç/CSV)
+    UI-->>U: °á°ú Ç¥½Ã
 ```
 ## Architecture Overview (Updated)
 
@@ -453,8 +453,8 @@ flowchart LR
 sequenceDiagram
     autonumber
     participant U as User
-    participant FE as Frontend (ChatView)
-    participant API as FastAPI (/api/query)
+    participant FE as Frontend ChatView
+    participant API as FastAPI API
     participant LOG as Logger (file)
     participant NX as Normalize
     participant CTX as Context
@@ -466,7 +466,7 @@ sequenceDiagram
     participant VAL as Validation Pipeline
     participant EXE as Executor
 
-    U->>FE: ì§ˆì˜ ìž…ë ¥
+    U->>FE: ÁúÀÇ ÀÔ·Â
     FE->>API: POST /api/query
     API->>LOG: stage=start
     API->>NX: normalize
@@ -496,5 +496,6 @@ sequenceDiagram
     API->>EXE: run/materialize
     EXE-->>API: rows/meta
     API->>LOG: stage=end
-    API-->>FE: JSON(sql, rows, metadata)
+    API-->>FE: json response
 ```
+
