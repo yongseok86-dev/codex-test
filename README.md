@@ -294,3 +294,156 @@ flowchart LR
 
   R -->|Response JSON| FE
 ```
+## Sequence Diagram (Updated)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant FE as Frontend (ChatView)
+    participant API as FastAPI (/api/query | /api/query/stream)
+    participant NX as Normalize (preprocess)
+    participant CTX as Context (conversation)
+    participant NLU as NLU (extract)
+    participant PL as Planner (make_plan)
+    participant CAT as Schema Catalog
+    participant LINK as Schema Linking
+    participant PMT as Prompt (semantic + few-shot)
+    participant LLM as LLM (OpenAI/Claude/Gemini)
+    participant SG as SQLGen (Rule/Template)
+    participant GRD as Guard (ensure_safe + lint + parse)
+    participant PIPE as Validation Pipeline
+    participant EXE as Executor (run/materialize)
+    participant BQ as BigQuery (Connector)
+    participant RPR as Repair (LLM)
+    participant SUM as Summarize (LLM optional)
+    participant UI as Result Panel
+
+    U->>FE: 자연어 질의 입력
+    FE->>API: POST /api/query {q, conversation_id, use_llm, llm_provider, dry_run, limit, materialize}\n or GET /api/query/stream...
+    API->>NX: normalize(q)
+    NX-->>API: q_norm, meta
+    API->>CTX: load(conversation_id)
+    CTX-->>API: last_sql/plan (optional)
+    API->>NLU: extract(q_norm)
+    NLU-->>API: intent, slots
+    API->>PL: make_plan(intent, slots)
+    PL-->>API: plan
+    API->>CAT: load_catalog()
+    CAT-->>API: tables/columns
+    API->>LINK: schema_link(q_norm)
+    LINK-->>API: candidates, confidence
+
+    alt use_llm == true
+        API->>PMT: build semantic+few-shot prompt
+        PMT->>LLM: chat.completions
+        LLM-->>API: SQL (```sql ... ```)
+    else
+        API->>SG: generate(plan, limit)
+        SG-->>API: SQL
+    end
+
+    API->>GRD: ensure_safe + lint + parse(sqlglot)
+    GRD-->>API: ok or issues
+
+    API->>PIPE: run_pipeline(sql, plan)
+    PIPE-->>API: steps report (DRY RUN, EXPLAIN, SCHEMA, CANARY, ASSERTIONS)
+
+    alt pipeline failed
+        API->>RPR: attempt_repair(q_norm, sql, error, provider)
+        RPR-->>API: fixed_sql?
+        API->>GRD: re-validate fixed_sql
+        API->>PIPE: re-run pipeline
+    end
+
+    alt dry_run == true
+        API->>EXE: run(sql, dry_run=true)
+        EXE-->>API: meta(dry_run,cost)
+    else materialize == true
+        API->>EXE: materialize(sql)
+        EXE->>BQ: CTAS/TRUNCATE to dataset.table
+        BQ-->>EXE: ok
+        EXE-->>API: meta(destination table)
+    else full execute
+        API->>EXE: run(sql, dry_run=false)
+        EXE->>BQ: execute query
+        BQ-->>EXE: rows
+        EXE-->>API: rows + meta
+    end
+
+    opt SSE streaming
+        API-->>FE: event: normalize / context / nlu / plan / linking / sql / validated / check(step) / repair? / result
+    end
+    API-->>FE: JSON { sql, dry_run, rows?, metadata(validation_steps, linking, normalized, cost, summary, nl_summary?) }
+
+    FE->>UI: 결과 패널 업데이트(페이지네이션/CSV)
+    UI-->>U: 결과 표시
+```
+## Architecture Overview (Updated)
+
+```mermaid
+flowchart LR
+  subgraph Client
+    FE[Vue3 Frontend\nChatView + Components]
+  end
+
+  subgraph API[FastAPI Backend]
+    R[Routers\n/healthz,/readyz,/api/query,/api/query/stream]
+    NX[Normalize]
+    CTX[Context Store]
+    S_NLU[NLU]
+    S_PL[Planner]
+    CAT[Schema Catalog]
+    LINK[Schema Linking]
+    S_PMT[Prompt]
+    S_LLM[LLM Client]
+    S_TPL[Templates]
+    S_SG[SQLGen]
+    S_VAL[Guardrails + sqlglot]
+    S_PIPE[Validation Pipeline]
+    S_EXE[Executor]
+    BQCON[BQ Connector]
+  end
+
+  subgraph SEM[Semantic Layer]
+    SEM_YML[semantic.yml]
+    SEM_MET[metrics_definitions.yaml]
+    SEM_GQ[golden_queries.yaml]
+    SEM_DS[datasets.yaml]
+    ALIAS[aliases.yaml]
+  end
+
+  subgraph GCP[BigQuery]
+    BQ[(Project\nDatasets\nTables)]
+  end
+
+  subgraph LLM[Providers]
+    OAI[OpenAI]
+    CLAUDE[Claude]
+    GEM[Gemini]
+  end
+
+  FE -->|REST/SSE| R
+  R --> NX --> CTX --> S_NLU --> S_PL
+  S_PL --> CAT --> LINK
+  S_PL --> S_TPL
+  S_PL --> S_PMT --> S_LLM
+  S_LLM --> OAI
+  S_LLM --> CLAUDE
+  S_LLM --> GEM
+  S_TPL --> S_SG
+  S_LLM --> R
+  S_SG --> R
+  R --> S_VAL --> S_PIPE
+  S_PIPE --> BQCON --> BQ
+  R --> S_EXE --> BQ
+
+  S_PMT -.reads .-> SEM_YML
+  S_PMT -.reads .-> SEM_MET
+  S_PMT -.reads .-> SEM_GQ
+  S_PMT -.overrides .-> SEM_DS
+  CAT -.reads .-> SEM_YML
+  LINK -.aliases .-> ALIAS
+
+  R -->|Response JSON| FE
+```
