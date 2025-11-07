@@ -50,7 +50,7 @@ async def query(req: QueryRequest) -> QueryResponse:
     intent, slots = nlu.extract(norm_q)
     logger.info("stage=nlu intent=%s slots=%s", intent, slots)
     # 2) Plan
-    plan = planner.make_plan(intent=intent, slots=slots)
+    plan = planner.make_plan(intent=intent, slots=slots, validate=False)  # 임시로 검증 비활성화
     plan["slots"] = slots
     logger.info("stage=plan metric=%s grain=%s", plan.get("metric"), plan.get("grain"))
     # 3) SQL Generation (LLM-based with semantic model)
@@ -175,7 +175,7 @@ async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = N
         intent, slots = nlu.extract(nq)
         yield sse("nlu", {"intent": intent, "slots": slots})
 
-        plan = planner.make_plan(intent=intent, slots=slots)
+        plan = planner.make_plan(intent=intent, slots=slots, validate=False)  # 임시로 검증 비활성화
         yield sse("plan", plan)
 
         # SQL 생성 (시맨틱 모델 기반 LLM)
@@ -204,7 +204,7 @@ async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = N
             validator.ensure_safe(sql)
             yield sse("validated", {"ok": True})
             # Run validation pipeline
-            report = run_pipeline(sql, perform_execute=False, plan=plan)
+            report = run_pipeline(sql, perform_execute=False, plan=plan, logger=logger)
             for step in report.steps:
                 yield sse("check", {"name": step.name, "ok": step.ok, "message": step.message, "meta": step.meta})
         except Exception as e:

@@ -296,3 +296,106 @@ planner_config:
       grain: month     # 비교는 월별이 적합
     aggregation:
       grain: day       # 집계는 일별
+
+# GA4 BigQuery Export 스키마 정보
+# 네스티드 필드 접근 시 dot notation 사용
+ga4_schema:
+  # 중요: GA4 테이블의 네스티드 필드는 반드시 dot notation 사용
+  nested_fields:
+    # Device 필드 (RECORD 타입)
+    device:
+      - category: "device.category"  # mobile | desktop | tablet
+      - operating_system: "device.operating_system"  # Windows, iOS, Android
+      - browser: "device.browser"  # Chrome, Safari, Firefox
+      - language: "device.language"
+      - mobile_brand_name: "device.mobile_brand_name"  # Samsung, Apple
+      - mobile_model_name: "device.mobile_model_name"  # iPhone 13, Galaxy S21
+
+    # Geo 필드 (RECORD 타입)
+    geo:
+      - continent: "geo.continent"  # Americas, Europe, Asia
+      - country: "geo.country"  # KR, US, JP
+      - region: "geo.region"
+      - city: "geo.city"
+      - metro: "geo.metro"
+
+    # Traffic Source 필드 (RECORD 타입)
+    traffic_source:
+      - source: "traffic_source.source"  # google, facebook, direct
+      - medium: "traffic_source.medium"  # organic, cpc, referral
+      - name: "traffic_source.name"  # 캠페인명
+
+    # E-commerce 필드 (RECORD 타입)
+    ecommerce:
+      - transaction_id: "ecommerce.transaction_id"
+      - purchase_revenue: "ecommerce.purchase_revenue"
+      - purchase_revenue_in_usd: "ecommerce.purchase_revenue_in_usd"
+      - total_item_quantity: "ecommerce.total_item_quantity"
+
+  # REPEATED 필드 (UNNEST 필요)
+  repeated_fields:
+    # Event Parameters (REPEATED RECORD)
+    event_params:
+      access: |
+        (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'key_name')
+      examples:
+        - session_id: "(SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id')"
+        - page_location: "(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location')"
+        - page_title: "(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_title')"
+
+    # Items (REPEATED RECORD)
+    items:
+      access: "FROM table, UNNEST(items) AS item"
+      fields:
+        - item_id: "item.item_id"
+        - item_name: "item.item_name"
+        - price: "item.price"
+        - quantity: "item.quantity"
+
+  # 최상위 필드 (직접 접근)
+  top_level:
+    - event_date: "event_date"  # YYYYMMDD STRING
+    - event_timestamp: "event_timestamp"  # INT64 마이크로초
+    - event_name: "event_name"  # session_start, page_view, purchase
+    - user_pseudo_id: "user_pseudo_id"
+    - user_id: "user_id"
+    - stream_id: "stream_id"
+    - platform: "platform"  # WEB, IOS, ANDROID
+
+  # 시간 변환 함수
+  timestamp_functions:
+    to_date: "DATE(TIMESTAMP_MICROS(event_timestamp))"
+    to_datetime: "TIMESTAMP_MICROS(event_timestamp)"
+    to_hour: "EXTRACT(HOUR FROM TIMESTAMP_MICROS(event_timestamp))"
+
+# 일반적인 차원 매핑 (LLM 프롬프트용)
+common_dimensions:
+  디바이스: "device.category"
+  디바이스별: "device.category"
+  기기: "device.category"
+  OS: "device.operating_system"
+  운영체제: "device.operating_system"
+  브라우저: "device.browser"
+
+  국가: "geo.country"
+  지역: "geo.region"
+  도시: "geo.city"
+
+  채널: "traffic_source.medium"
+  소스: "traffic_source.source"
+  유입경로: "traffic_source.source"
+  캠페인: "traffic_source.name"
+
+  시간대: "EXTRACT(HOUR FROM TIMESTAMP_MICROS(event_timestamp))"
+  날짜: "DATE(TIMESTAMP_MICROS(event_timestamp))"
+  일자: "DATE(TIMESTAMP_MICROS(event_timestamp))"
+
+# 주의사항
+notes:
+  - "GA4 테이블은 events_YYYYMMDD 또는 events_intraday_YYYYMMDD 형식"
+  - "와일드카드 사용 시: events_* 와 _TABLE_SUFFIX 조건 함께 사용"
+  - "event_timestamp는 INT64 마이크로초이므로 TIMESTAMP_MICROS() 변환 필수"
+  - "RECORD 타입 필드는 반드시 dot notation 사용 (device.category)"
+  - "REPEATED 필드는 UNNEST() 사용 필수 (event_params, items)"
+  - "세션 ID는 event_params에서 추출: (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id')"
+

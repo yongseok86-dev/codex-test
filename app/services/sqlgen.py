@@ -379,6 +379,9 @@ def _build_sql_generation_prompt(
     # 테이블 정보 포맷팅
     tables_info = _format_tables_for_prompt(required_tables, table_suffix_info)
 
+    # GA4 스키마 정보 추출
+    ga4_schema_info = _format_ga4_schema_for_prompt(semantic_model)
+
     # 프롬프트 구성
     prompt = f"""당신은 BigQuery SQL 전문가입니다. 다음 자연어 질문을 BigQuery SQL로 변환하세요.
 
@@ -407,13 +410,20 @@ def _build_sql_generation_prompt(
 - 날짜 범위: {table_suffix_info['start_date']} ~ {table_suffix_info['end_date']}
 - 조건: {table_suffix_info['suffix_condition']}
 
+# GA4 스키마 (중요!)
+{ga4_schema_info}
+
 # SQL 생성 규칙
 1. BigQuery 표준 SQL 문법 사용
 2. GA4 테이블은 events_* 와일드카드와 _TABLE_SUFFIX 조건 사용
 3. event_timestamp는 INT64 마이크로초이므로 TIMESTAMP_MICROS() 변환 필수
-4. 시맨틱 모델의 메트릭 정의(expr)를 정확히 따를 것
-5. GROUP BY, ORDER BY는 grain에 맞게 생성
-6. LIMIT {limit if limit else '없음'}
+4. **GA4 네스티드 필드는 반드시 dot notation 사용**:
+   - device_category → device.category
+   - traffic_medium → traffic_source.medium
+   - geo_country → geo.country
+5. 시맨틱 모델의 메트릭 정의(expr)를 정확히 따를 것
+6. GROUP BY, ORDER BY는 grain에 맞게 생성
+7. LIMIT {limit if limit else '없음'}
 
 # 대화 컨텍스트
 {_format_context_for_prompt(context)}
@@ -516,6 +526,58 @@ def _format_context_for_prompt(context: Dict[str, Any]) -> str:
         lines.append(f"이전 계획: {context['last_plan']}")
 
     return "\n".join(lines) if lines else "없음"
+
+
+def _format_ga4_schema_for_prompt(semantic_model: Dict[str, Any]) -> str:
+    """GA4 스키마 정보를 프롬프트용으로 포맷팅"""
+    ga4_schema = semantic_model.get("ga4_schema", {})
+
+    if not ga4_schema:
+        return "GA4 스키마 정보 없음"
+
+    lines = []
+    lines.append("## GA4 네스티드 필드 (RECORD 타입)")
+    lines.append("**중요**: 반드시 dot notation 사용!")
+    lines.append("")
+
+    # 일반 차원 매핑
+    common_dims = semantic_model.get("common_dimensions", {})
+    if common_dims:
+        lines.append("### 한글 → 필드명 매핑")
+        for korean, field in list(common_dims.items())[:10]:  # 상위 10개만
+            lines.append(f"- {korean} → {field}")
+        lines.append("")
+
+    # 네스티드 필드 설명
+    nested = ga4_schema.get("nested_fields", {})
+
+    if nested.get("device"):
+        lines.append("### Device 필드 (device.*)")
+        lines.append("- device.category: mobile | desktop | tablet")
+        lines.append("- device.operating_system: Windows, iOS, Android")
+        lines.append("- device.browser: Chrome, Safari, Firefox")
+        lines.append("")
+
+    if nested.get("geo"):
+        lines.append("### Geo 필드 (geo.*)")
+        lines.append("- geo.country: KR, US, JP (국가 코드)")
+        lines.append("- geo.city: 도시명")
+        lines.append("")
+
+    if nested.get("traffic_source"):
+        lines.append("### Traffic Source 필드 (traffic_source.*)")
+        lines.append("- traffic_source.source: google, facebook, direct")
+        lines.append("- traffic_source.medium: organic, cpc, referral")
+        lines.append("")
+
+    # 주의사항
+    notes = semantic_model.get("notes", [])
+    if notes:
+        lines.append("### 주의사항")
+        for note in notes[:3]:  # 상위 3개만
+            lines.append(f"- {note}")
+
+    return "\n".join(lines)
 
 
 def _call_llm_for_sql(prompt: str, provider: str) -> str:

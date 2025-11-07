@@ -1,0 +1,201 @@
+# GA4 BigQuery Export Schema
+# Google Analytics 4 이벤트 테이블의 중요 필드 정의
+# 참조: https://support.google.com/analytics/answer/7029846
+
+# 네스티드 필드 구조 (RECORD 타입)
+nested_fields:
+  # Device 정보 (RECORD)
+  device:
+    category: STRING  # mobile, desktop, tablet
+    mobile_brand_name: STRING
+    mobile_model_name: STRING
+    mobile_marketing_name: STRING
+    mobile_os_hardware_model: STRING
+    operating_system: STRING
+    operating_system_version: STRING
+    vendor_id: STRING
+    advertising_id: STRING
+    language: STRING
+    is_limited_ad_tracking: STRING
+    time_zone_offset_seconds: INT64
+    browser: STRING
+    browser_version: STRING
+    web_info:
+      browser: STRING
+      browser_version: STRING
+      hostname: STRING
+
+  # 지리 정보 (RECORD)
+  geo:
+    continent: STRING  # Americas, Europe, Asia, etc.
+    sub_continent: STRING
+    country: STRING  # 국가 코드
+    region: STRING  # 지역/주
+    metro: STRING
+    city: STRING
+
+  # 트래픽 소스 (RECORD)
+  traffic_source:
+    name: STRING  # 캠페인명
+    medium: STRING  # organic, cpc, referral, etc.
+    source: STRING  # google, facebook, direct, etc.
+
+  # 수집된 트래픽 소스 (RECORD)
+  collected_traffic_source:
+    manual_campaign_id: STRING
+    manual_campaign_name: STRING
+    manual_source: STRING
+    manual_medium: STRING
+    manual_term: STRING
+    manual_content: STRING
+    gclid: STRING
+    dclid: STRING
+    srsltid: STRING
+
+  # 앱 정보 (RECORD)
+  app_info:
+    id: STRING
+    version: STRING
+    install_store: STRING
+    firebase_app_id: STRING
+    install_source: STRING
+
+  # E-commerce 정보 (RECORD)
+  ecommerce:
+    total_item_quantity: INT64
+    purchase_revenue_in_usd: FLOAT64
+    purchase_revenue: FLOAT64
+    refund_value_in_usd: FLOAT64
+    refund_value: FLOAT64
+    shipping_value_in_usd: FLOAT64
+    shipping_value: FLOAT64
+    tax_value_in_usd: FLOAT64
+    tax_value: FLOAT64
+    unique_items: INT64
+    transaction_id: STRING
+
+# 최상위 필드
+top_level_fields:
+  event_date: STRING  # YYYYMMDD 형식
+  event_timestamp: INT64  # 마이크로초 (TIMESTAMP_MICROS 변환 필요)
+  event_name: STRING  # session_start, page_view, purchase 등
+  event_params: RECORD  # REPEATED, key-value 쌍
+  event_previous_timestamp: INT64
+  event_value_in_usd: FLOAT64
+  event_bundle_sequence_id: INT64
+  event_server_timestamp_offset: INT64
+
+  user_id: STRING
+  user_pseudo_id: STRING  # 익명 사용자 ID
+  user_properties: RECORD  # REPEATED, key-value 쌍
+  user_first_touch_timestamp: INT64
+  user_ltv: RECORD  # revenue, currency
+
+  privacy_info: RECORD  # analytics_storage, ads_storage
+  stream_id: STRING
+  platform: STRING  # WEB, IOS, ANDROID
+
+  # 세션 정보
+  ga_session_id: INT64  # (event_params에서 추출)
+  ga_session_number: INT64  # (event_params에서 추출)
+
+# REPEATED 필드 (배열)
+repeated_fields:
+  event_params:
+    - key: STRING
+    - value:
+        string_value: STRING
+        int_value: INT64
+        float_value: FLOAT64
+        double_value: FLOAT64
+
+  user_properties:
+    - key: STRING
+    - value:
+        string_value: STRING
+        int_value: INT64
+        float_value: FLOAT64
+        double_value: FLOAT64
+        set_timestamp_micros: INT64
+
+  items:  # E-commerce 상품 배열
+    - item_id: STRING
+    - item_name: STRING
+    - item_brand: STRING
+    - item_variant: STRING
+    - item_category: STRING
+    - item_category2: STRING
+    - item_category3: STRING
+    - item_category4: STRING
+    - item_category5: STRING
+    - price_in_usd: FLOAT64
+    - price: FLOAT64
+    - quantity: INT64
+    - item_revenue_in_usd: FLOAT64
+    - item_revenue: FLOAT64
+    - item_refund_in_usd: FLOAT64
+    - item_refund: FLOAT64
+    - coupon: STRING
+    - affiliation: STRING
+    - location_id: STRING
+    - item_list_id: STRING
+    - item_list_name: STRING
+    - item_list_index: STRING
+    - promotion_id: STRING
+    - promotion_name: STRING
+    - creative_name: STRING
+    - creative_slot: STRING
+
+# 중요한 네스티드 필드 접근 예시
+nested_field_examples:
+  device_category: "device.category"  # mobile, desktop, tablet
+  device_os: "device.operating_system"  # Windows, iOS, Android
+  device_browser: "device.browser"  # Chrome, Safari, Firefox
+
+  geo_country: "geo.country"  # KR, US, JP
+  geo_city: "geo.city"
+
+  traffic_medium: "traffic_source.medium"  # organic, cpc, referral
+  traffic_source: "traffic_source.source"  # google, facebook, direct
+
+  session_id_param: "(SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id')"
+  page_location: "(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location')"
+
+# 일반적인 쿼리 패턴
+query_patterns:
+  # 디바이스별 집계
+  device_grouping: |
+    SELECT
+      device.category AS device_category,
+      COUNT(*) AS events
+    FROM `project.dataset.events_*`
+    WHERE _TABLE_SUFFIX BETWEEN '20250101' AND '20250107'
+    GROUP BY device.category
+
+  # 세션 ID 추출
+  session_extraction: |
+    SELECT
+      user_pseudo_id,
+      (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS session_id,
+      COUNT(*) AS events
+    FROM `project.dataset.events_*`
+    GROUP BY 1, 2
+
+  # E-commerce 아이템 분석
+  items_analysis: |
+    SELECT
+      item.item_name,
+      SUM(item.quantity) AS total_quantity
+    FROM `project.dataset.events_*`,
+      UNNEST(items) AS item
+    WHERE event_name = 'purchase'
+    GROUP BY item.item_name
+
+  # 트래픽 소스별 분석
+  traffic_analysis: |
+    SELECT
+      traffic_source.source,
+      traffic_source.medium,
+      COUNT(DISTINCT user_pseudo_id) AS users
+    FROM `project.dataset.events_*`
+    GROUP BY 1, 2

@@ -6,7 +6,9 @@
       "Bash(python stream_demo.py:*)",
       "Bash(venv\\Scripts\\python.exe:*)",
       "Bash(.\\venv\\Scripts\\python.exe:*)",
-      "Bash(./venv/Scripts/python.exe:*)"
+      "Bash(./venv/Scripts/python.exe:*)",
+      "Bash(taskkill //F //PID 9572)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []
