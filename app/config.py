@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     log_file_path: str | None = None  # e.g., "logs/app.log" to enable
     log_max_bytes: int = 5_000_000
     log_backup_count: int = 5
+    # Daily rotation (일자별 로그) 설정
+    log_rotation: str = "daily"  # "daily" or "size"
+    log_when: str = "midnight"   # Timed rotation anchor
+    log_interval: int = 1         # every N units of `log_when`
+    log_utc: bool = False         # use UTC timestamps for rotation
 
     class Config:
         env_file = ".env"

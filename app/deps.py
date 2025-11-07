@@ -1,7 +1,7 @@
 import logging
 import os
 from typing import Optional
-from logging.handlers import RotatingFileHandler
+from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from app.config import settings
 
 try:
@@ -34,12 +34,28 @@ def get_logger(name: str = "app", level: int = logging.INFO) -> logging.Logger:
             except Exception:
                 pass
             try:
-                file_handler = RotatingFileHandler(
-                    settings.log_file_path,
-                    maxBytes=getattr(settings, "log_max_bytes", 5_000_000),
-                    backupCount=getattr(settings, "log_backup_count", 5),
-                    encoding="utf-8",
-                )
+                rotation = (settings.log_rotation or "daily").lower()
+                if rotation == "daily":
+                    file_handler = TimedRotatingFileHandler(
+                        settings.log_file_path,
+                        when=getattr(settings, "log_when", "midnight"),
+                        interval=max(1, int(getattr(settings, "log_interval", 1))),
+                        backupCount=getattr(settings, "log_backup_count", 5),
+                        encoding="utf-8",
+                        utc=bool(getattr(settings, "log_utc", False)),
+                    )
+                    # Use YYYY-MM-DD suffix for rotated files
+                    try:
+                        file_handler.suffix = "%Y-%m-%d"
+                    except Exception:
+                        pass
+                else:
+                    file_handler = RotatingFileHandler(
+                        settings.log_file_path,
+                        maxBytes=getattr(settings, "log_max_bytes", 5_000_000),
+                        backupCount=getattr(settings, "log_backup_count", 5),
+                        encoding="utf-8",
+                    )
                 file_handler.setLevel(level)
                 file_handler.setFormatter(
                     logging.Formatter(fmt="%(asctime)s %(levelname)s %(name)s %(message)s")
