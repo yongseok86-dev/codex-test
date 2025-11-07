@@ -120,3 +120,179 @@ vocabulary:
     '전환율': ['conversion','conversion_rate','전환']
   units:
     currency: KRW
+
+# NLU 키워드 설정 (Natural Language Understanding)
+nlu_keywords:
+  # 의도(Intent) 키워드
+  intents:
+    comparison:
+      - '비교'
+      - '대비'
+      - 'vs'
+      - 'compare'
+      - '차이'
+    metric_over_time:
+      - '추이'
+      - 'trend'
+      - 'over time'
+      - '변화'
+      - '흐름'
+    aggregation:
+      - '별'
+      - '그룹'
+      - 'group by'
+      - '분류'
+      - '구분'
+
+  # 메트릭 키워드
+  metrics:
+    gmv:
+      - '매출'
+      - 'gmv'
+      - '매출액'
+      - 'revenue'
+      - '거래액'
+      - '취급액'
+      - '매출금액'
+      - '취급금액'
+    orders:
+      - '주문'
+      - 'orders'
+      - '주문건수'
+      - '주문수'
+      - '결제'
+    sessions:
+      - '세션'
+      - '방문'
+      - 'sessions'
+      - 'visit'
+      - '접속'
+    users:
+      - '사용자'
+      - '유저'
+      - 'users'
+      - '방문자'
+      - '고객'
+      - '회원'
+    events:
+      - '이벤트'
+      - 'events'
+      - '클릭'
+      - '액션'
+
+  # 시간 범위 키워드
+  time_windows:
+    days_7:
+      - '지난 7일'
+      - '최근 7일'
+      - 'last 7 days'
+      - '일주일'
+    days_30:
+      - '지난 30일'
+      - '최근 30일'
+      - '최근 한달'
+      - 'last 30 days'
+      - '한 달'
+    days_1:
+      - '어제'
+      - 'yesterday'
+      - '하루 전'
+    weeks_1:
+      - '이번주'
+      - 'this week'
+      - '금주'
+    months_1:
+      - '이번달'
+      - 'this month'
+      - '이달'
+      - '금월'
+
+  # 그룹핑 키워드
+  group_by:
+    device_category:
+      - '디바이스별'
+      - '기기별'
+      - 'device'
+      - '디바이스'
+    source_medium:
+      - '채널별'
+      - '소스별'
+      - 'channel'
+      - 'source'
+      - '유입경로별'
+    hour:
+      - '시간대별'
+      - '시간별'
+      - 'hour'
+      - '시각별'
+    date:
+      - '일별'
+      - '날짜별'
+      - 'daily'
+      - '데일리'
+
+  # 필터 키워드
+  filters:
+    device_mobile:
+      - '모바일'
+      - 'mobile'
+      - '휴대폰'
+    device_desktop:
+      - '데스크톱'
+      - 'desktop'
+      - 'pc'
+      - '컴퓨터'
+    status_completed:
+      - '완료'
+      - 'completed'
+      - '완료된'
+
+  # 집계 단위 키워드
+  grains:
+    day:
+      - '일별'
+      - '하루'
+      - 'daily'
+      - '데일리'
+    week:
+      - '주별'
+      - '주간'
+      - 'weekly'
+      - '위클리'
+    month:
+      - '월별'
+      - '월간'
+      - 'monthly'
+      - '먼슬리'
+
+# Planner 설정 (Query Planner Configuration)
+planner_config:
+  # 유효한 의도 목록
+  valid_intents:
+    - metric
+    - metric_over_time
+    - comparison
+    - aggregation
+
+  # 유효한 집계 단위 (Grain) 목록
+  valid_grains:
+    - day
+    - week
+    - month
+    - hour
+
+  # 글로벌 기본값
+  defaults:
+    metric: orders      # 기본 메트릭
+    grain: day         # 기본 집계 단위
+
+  # 의도별 최적 기본값
+  intent_defaults:
+    metric:
+      grain: day       # 단순 메트릭은 일별
+    metric_over_time:
+      grain: day       # 시간 추이는 일별
+    comparison:
+      grain: month     # 비교는 월별이 적합
+    aggregation:
+      grain: day       # 집계는 일별

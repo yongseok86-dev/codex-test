@@ -53,17 +53,20 @@ async def query(req: QueryRequest) -> QueryResponse:
     plan = planner.make_plan(intent=intent, slots=slots)
     plan["slots"] = slots
     logger.info("stage=plan metric=%s grain=%s", plan.get("metric"), plan.get("grain"))
-    # 3) SQL Generation (LLM or rule-based)
-    if req.use_llm:
-        try:
-            sql = generate_sql_via_llm(norm_q, provider=req.llm_provider)
-            logger.info("stage=llm_sql source=llm")
-        except Exception as e:
-            logger.warning(f"LLM provider failed, falling back to rule-based: {e}")
-            sql = sqlgen.generate(plan, limit=req.limit)
-    else:
-        sql = sqlgen.generate(plan, limit=req.limit)
-        logger.info("stage=llm_sql source=rule")
+    # 3) SQL Generation (LLM-based with semantic model)
+    # sqlgen.generate()가 이제 LLM을 사용하여 시맨틱 모델 기반 SQL 생성
+    try:
+        sql = sqlgen.generate(
+            plan=plan,
+            question=norm_q,
+            limit=req.limit,
+            llm_provider=req.llm_provider,
+            conversation_id=req.conversation_id
+        )
+        logger.info("stage=llm_sql source=semantic_llm provider=%s", req.llm_provider or settings.llm_provider)
+    except Exception as e:
+        logger.error(f"SQL generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"SQL generation failed: {str(e)}")
 
     # Optional: schema linking
     from app.services import linking, guard
@@ -154,6 +157,8 @@ async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = N
     async def event_gen():
         def sse(event: str, data: dict):
             payload = json.dumps(data, ensure_ascii=False)
+
+            print("query.py = > ", f"event: {event}\ndata: {payload}\n\n")
             return f"event: {event}\ndata: {payload}\n\n"
 
         # Normalize and context
@@ -173,18 +178,22 @@ async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = N
         plan = planner.make_plan(intent=intent, slots=slots)
         yield sse("plan", plan)
 
-        if use_llm:
-            try:
-                sql = generate_sql_via_llm(nq, provider=llm_provider)
-                yield sse("sql", {"sql": sql, "source": "llm", "provider": llm_provider or ""})
-            except Exception as e:
-                logger.warning(f"LLM provider failed, fallback to rule-based: {e}")
-                yield sse("info", {"message": "LLM provider failed; falling back to rule-based SQL."})
-                sql = sqlgen.generate(plan, limit=limit)
-                yield sse("sql", {"sql": sql, "source": "rule"})
-        else:
-            sql = sqlgen.generate(plan, limit=limit)
-            yield sse("sql", {"sql": sql, "source": "rule"})
+        # SQL 생성 (시맨틱 모델 기반 LLM)
+        sql = None  # 변수 초기화
+        try:
+            sql = sqlgen.generate(
+                plan=plan,
+                question=nq,
+                limit=limit,
+                llm_provider=llm_provider,
+                conversation_id=None  # 스트리밍에서는 conversation_id 미지원
+            )
+            provider_used = llm_provider or settings.llm_provider or "openai"
+            yield sse("sql", {"sql": sql, "source": "semantic_llm", "provider": provider_used})
+        except Exception as e:
+            logger.error(f"SQL generation failed: {e}")
+            yield sse("error", {"message": f"SQL generation failed: {str(e)}"})
+            return  # SQL 생성 실패 시 즉시 종료
 
         # Schema linking
         from app.services import linking

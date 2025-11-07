@@ -1,7 +1,23 @@
 version: 2
 updates:
+  # GitHub Actions 업데이트는 끔
+  # (CI/CD 워크플로 자동 업데이트가 필요 없다면 아래 블록 삭제해도 됨)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"  # 주기: 한 달에 한 번만 확인
+    open-pull-requests-limit: 1  # PR 한 개만 유지 (중복 방지)
 
+  # npm (Node.js 패키지) 업데이트 (frontend 폴더 기준)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
+
+  # Python 패키지 업데이트 (루트 기준)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2

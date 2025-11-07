@@ -19,7 +19,7 @@ def get_logger(name: str = "app", level: int = logging.INFO) -> logging.Logger:
         else:
             handler = logging.StreamHandler()
             formatter = logging.Formatter(
-                fmt="%(asctime)s %(levelname)s %(name)s %(message)s"
+                fmt="%(asctime)s : %(filename)s : %(funcName)s : %(levelname)s : %(message)s"
             )
             handler.setFormatter(formatter)
         handler.setLevel(level)
@@ -58,7 +58,7 @@ def get_logger(name: str = "app", level: int = logging.INFO) -> logging.Logger:
                     )
                 file_handler.setLevel(level)
                 file_handler.setFormatter(
-                    logging.Formatter(fmt="%(asctime)s %(levelname)s %(name)s %(message)s")
+                    logging.Formatter(fmt="%(asctime)s : %(filename)s : %(funcName)s : %(levelname)s : %(message)s")
                 )
                 logger.addHandler(file_handler)
             except Exception:
@@ -85,7 +85,7 @@ def setup_logging(level: int = logging.INFO) -> None:
     if not any(isinstance(h, logging.StreamHandler) for h in root.handlers):
         ch = logging.StreamHandler()
         ch.setLevel(level)
-        ch.setFormatter(logging.Formatter(fmt="%(asctime)s %(levelname)s %(name)s %(message)s"))
+        ch.setFormatter(logging.Formatter(fmt="%(asctime)s : %(filename)s : %(funcName)s : %(levelname)s : %(message)s"))
         root.addHandler(ch)
 
     # File handler (if configured)
@@ -119,7 +119,7 @@ def setup_logging(level: int = logging.INFO) -> None:
                     encoding="utf-8",
                 )
             fh.setLevel(level)
-            fh.setFormatter(logging.Formatter(fmt="%(asctime)s %(levelname)s %(name)s %(message)s"))
+            fh.setFormatter(logging.Formatter(fmt="%(asctime)s : %(filename)s : %(funcName)s : %(levelname)s : %(message)s"))
             root.addHandler(fh)
         except Exception:
             pass

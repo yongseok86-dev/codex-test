@@ -27,7 +27,7 @@ async def collect_sse_events(response, max_events=50):
 
 
 async def test_query_stream_basic():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(app=app, base_url="http://localhost") as ac:
         params = {
             "q": "지난 7일 주문 추이",
             "limit": 10,

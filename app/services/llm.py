@@ -40,6 +40,14 @@ def generate_sql_via_llm(question: str, provider: Optional[str] = None) -> str:
             raise LLMNotConfigured("OpenAI provider not available or missing API key")
         client = OpenAI(api_key=settings.openai_api_key)
         model = settings.openai_model or "gpt-4o-mini"
+
+        # OpenAI 최신 모델은 max_completion_tokens 사용
+        token_param = {}
+        if "gpt-4o" in model or "o1" in model or "o3" in model:
+            token_param["max_completion_tokens"] = max_tokens
+        else:
+            token_param["max_tokens"] = max_tokens
+
         resp = client.chat.completions.create(
             model=model,
             messages=[
@@ -47,7 +55,7 @@ def generate_sql_via_llm(question: str, provider: Optional[str] = None) -> str:
                 {"role": "user", "content": prompt},
             ],
             temperature=temperature,
-            max_tokens=max_tokens,
+            **token_param,
         )
         content = resp.choices[0].message.content or ""
         return _extract_sql_from_text(content)
