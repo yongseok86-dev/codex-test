@@ -447,3 +447,54 @@ flowchart LR
 
   R -->|Response JSON| FE
 ```
+## Sequence Diagram (Logging markers)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant FE as Frontend (ChatView)
+    participant API as FastAPI (/api/query)
+    participant LOG as Logger (file)
+    participant NX as Normalize
+    participant CTX as Context
+    participant NLU as NLU
+    participant PL as Planner
+    participant LINK as Schema Linking
+    participant GEN as SQL Gen (LLM/Rule)
+    participant GRD as Guard
+    participant VAL as Validation Pipeline
+    participant EXE as Executor
+
+    U->>FE: 질의 입력
+    FE->>API: POST /api/query
+    API->>LOG: stage=start
+    API->>NX: normalize
+    NX-->>API: q_norm/meta
+    API->>LOG: stage=normalize
+    API->>CTX: load
+    CTX-->>API: ctx
+    API->>LOG: stage=context
+    API->>NLU: extract
+    NLU-->>API: intent/slots
+    API->>LOG: stage=nlu
+    API->>PL: make_plan
+    PL-->>API: plan
+    API->>LOG: stage=plan
+    API->>LINK: schema_link
+    LINK-->>API: candidates/conf
+    API->>LOG: stage=linking
+    API->>GEN: llm or rule
+    GEN-->>API: sql
+    API->>LOG: stage=llm_sql
+    API->>GRD: ensure_safe + parse
+    GRD-->>API: ok
+    API->>LOG: stage=guard
+    API->>VAL: run_pipeline
+    VAL-->>API: steps report
+    API->>LOG: stage=lint/dry_run/explain/schema/canary/assertions
+    API->>EXE: run/materialize
+    EXE-->>API: rows/meta
+    API->>LOG: stage=end
+    API-->>FE: JSON(sql, rows, metadata)
+```

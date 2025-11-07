@@ -34,40 +34,49 @@ class QueryResponse(BaseModel):
 
 @router.post("/query", response_model=QueryResponse)
 async def query(req: QueryRequest) -> QueryResponse:
-    logger = get_logger(__name__)
+    logger = get_logger("pipeline")
+    logger.info("stage=start q=%s conv=%s llm=%s provider=%s dry_run=%s materialize=%s", req.q, req.conversation_id, req.use_llm, req.llm_provider, req.dry_run, req.materialize)
     if not req.q or len(req.q.strip()) < 2:
         raise HTTPException(status_code=400, detail="query text 'q' is required")
 
     # 0) Normalize
     from app.services import normalize, context
     norm_q, norm_meta = normalize.normalize(req.q)
+    logger.info("stage=normalize text_len=%s", len(norm_q))
     ctx = context.get_context(req.conversation_id or "")
+    logger.info("stage=context keys=%s", list(ctx.keys()))
 
     # 1) NLU
     intent, slots = nlu.extract(norm_q)
+    logger.info("stage=nlu intent=%s slots=%s", intent, slots)
     # 2) Plan
     plan = planner.make_plan(intent=intent, slots=slots)
     plan["slots"] = slots
+    logger.info("stage=plan metric=%s grain=%s", plan.get("metric"), plan.get("grain"))
     # 3) SQL Generation (LLM or rule-based)
     if req.use_llm:
         try:
             sql = generate_sql_via_llm(norm_q, provider=req.llm_provider)
+            logger.info("stage=llm_sql source=llm")
         except Exception as e:
             logger.warning(f"LLM provider failed, falling back to rule-based: {e}")
             sql = sqlgen.generate(plan, limit=req.limit)
     else:
         sql = sqlgen.generate(plan, limit=req.limit)
+        logger.info("stage=llm_sql source=rule")
 
     # Optional: schema linking
     from app.services import linking, guard
     linking_info = linking.schema_link(norm_q)
+    logger.info("stage=linking confidence=%s candidates=%s", linking_info.get("confidence"), len(linking_info.get("candidates", [])))
     try:
         guard.parse_sql(sql)
     except Exception as e:
         logger.warning(f"SQL parse failed: {e}")
     # 4) Guardrails/Validation (lint + pipeline)
     validator.ensure_safe(sql)
-    report = run_pipeline(sql, perform_execute=False, plan=plan)
+    logger.info("stage=guard ok")
+    report = run_pipeline(sql, perform_execute=False, plan=plan, logger=logger)
     # If validation failed and LLM allowed, try one repair
     failed = next((s for s in report.steps if not s.ok), None)
     repaired = None
@@ -77,7 +86,7 @@ async def query(req: QueryRequest) -> QueryResponse:
         if fixed and fixed != sql:
             try:
                 validator.ensure_safe(fixed)
-                r2 = run_pipeline(fixed, perform_execute=False, plan=plan)
+                r2 = run_pipeline(fixed, perform_execute=False, plan=plan, logger=logger)
                 if all(s.ok for s in r2.steps):
                     repaired = {"original_sql": sql, "fixed_sql": fixed, "failed_step": failed.name}
                     sql = fixed
@@ -103,7 +112,7 @@ async def query(req: QueryRequest) -> QueryResponse:
                     if fixed and fixed != sql:
                         try:
                             validator.ensure_safe(fixed)
-                            r2 = run_pipeline(fixed, perform_execute=False, plan=plan)
+                            r2 = run_pipeline(fixed, perform_execute=False, plan=plan, logger=logger)
                             if all(s.ok for s in r2.steps):
                                 sql = fixed
                                 report = r2
@@ -135,22 +144,30 @@ async def query(req: QueryRequest) -> QueryResponse:
     # Update context
     context.update_context(req.conversation_id or "", {"last_sql": sql, "last_plan": plan})
 
+    logger.info("stage=end dry_run=%s rows=%s", dry, 0 if (result.rows is None) else len(result.rows))
     return QueryResponse(sql=sql, dry_run=dry, rows=result.rows, metadata=meta)
 
 
 @router.get("/query/stream")
 async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = None, use_llm: bool | None = None, llm_provider: str | None = None):
-    logger = get_logger(__name__)
+    logger = get_logger("pipeline.stream")
     async def event_gen():
         def sse(event: str, data: dict):
             payload = json.dumps(data, ensure_ascii=False)
             return f"event: {event}\ndata: {payload}\n\n"
 
+        # Normalize and context
+        from app.services import normalize, context
+        nq, nmeta = normalize.normalize(q)
+        yield sse("normalize", {"text_len": len(nq), "meta": nmeta})
+        ctx = context.get_context("")
+        yield sse("context", {"keys": list(ctx.keys())})
+
         if not q or len(q.strip()) < 2:
             yield sse("error", {"message": "query text 'q' is required"})
             return
 
-        intent, slots = nlu.extract(q)
+        intent, slots = nlu.extract(nq)
         yield sse("nlu", {"intent": intent, "slots": slots})
 
         plan = planner.make_plan(intent=intent, slots=slots)
@@ -158,7 +175,7 @@ async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = N
 
         if use_llm:
             try:
-                sql = generate_sql_via_llm(q, provider=llm_provider)
+                sql = generate_sql_via_llm(nq, provider=llm_provider)
                 yield sse("sql", {"sql": sql, "source": "llm", "provider": llm_provider or ""})
             except Exception as e:
                 logger.warning(f"LLM provider failed, fallback to rule-based: {e}")
@@ -168,6 +185,11 @@ async def query_stream(q: str, limit: int | None = 100, dry_run: bool | None = N
         else:
             sql = sqlgen.generate(plan, limit=limit)
             yield sse("sql", {"sql": sql, "source": "rule"})
+
+        # Schema linking
+        from app.services import linking
+        li = linking.schema_link(nq)
+        yield sse("linking", {"confidence": li.get("confidence"), "candidates": li.get("candidates")})
 
         try:
             validator.ensure_safe(sql)

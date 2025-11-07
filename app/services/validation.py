@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+import logging
 from app.semantic.loader import load_semantic_root
 
 from app.services import validator
@@ -157,37 +158,61 @@ def domain_assertions(sql: str, plan: Optional[Dict[str, Any]] = None) -> StepRe
         return StepResult(name="assertions", ok=False, message=str(e))
 
 
-def run_pipeline(sql: str, perform_execute: bool = False, plan: Optional[Dict[str, Any]] = None) -> ValidationReport:
+def run_pipeline(sql: str, perform_execute: bool = False, plan: Optional[Dict[str, Any]] = None, logger: Optional[logging.Logger] = None) -> ValidationReport:
     steps: List[StepResult] = []
 
     # 1) Lint
+    if logger:
+        logger.info("stage=lint start")
     steps.append(lint_sql(sql))
+    if logger:
+        logger.info("stage=lint end ok=%s", steps[-1].ok)
     if not steps[-1].ok:
         return ValidationReport(steps=steps, sql=sql)
 
     # 2) DRY RUN
+    if logger:
+        logger.info("stage=dry_run start")
     steps.append(dry_run(sql))
+    if logger:
+        logger.info("stage=dry_run end ok=%s bytes=%s", steps[-1].ok, steps[-1].meta.get("total_bytes_processed") if steps[-1].ok else None)
     if not steps[-1].ok:
         return ValidationReport(steps=steps, sql=sql)
 
     # 3) EXPLAIN
+    if logger:
+        logger.info("stage=explain start")
     steps.append(explain(sql))
+    if logger:
+        logger.info("stage=explain end ok=%s", steps[-1].ok)
     if not steps[-1].ok:
         return ValidationReport(steps=steps, sql=sql)
 
     # 4) SCHEMA
+    if logger:
+        logger.info("stage=schema start")
     sch = schema(sql)
     steps.append(sch)
+    if logger:
+        logger.info("stage=schema end ok=%s cols=%s", steps[-1].ok, len((sch.meta.get("schema") or [])) if steps[-1].ok else None)
     if not steps[-1].ok:
         return ValidationReport(steps=steps, sql=sql)
 
     # 5) CANARY
+    if logger:
+        logger.info("stage=canary start")
     steps.append(canary(sql))
+    if logger:
+        logger.info("stage=canary end ok=%s rows=%s", steps[-1].ok, steps[-1].meta.get("rowcount") if steps[-1].ok else None)
     if not steps[-1].ok:
         return ValidationReport(steps=steps, sql=sql, schema=sch.meta.get("schema"))
 
     # 6) DOMAIN ASSERTIONS
+    if logger:
+        logger.info("stage=assertions start")
     steps.append(domain_assertions(sql, plan=plan))
+    if logger:
+        logger.info("stage=assertions end ok=%s", steps[-1].ok)
     if not steps[-1].ok:
         return ValidationReport(steps=steps, sql=sql, schema=sch.meta.get("schema"))
 

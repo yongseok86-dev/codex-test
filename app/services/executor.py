@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, List
 
 from app.config import settings
+from app.deps import get_logger
 
 try:
     from google.cloud import bigquery  # type: ignore
@@ -16,6 +17,8 @@ class QueryResult:
 
 
 async def run(sql: str, dry_run: bool = True) -> QueryResult:
+    logger = get_logger("pipeline.exec")
+    logger.info("stage=execute mode=%s", "dry_run" if dry_run else "full")
     # If BigQuery lib not available, return stub
     if bigquery is None:
         return QueryResult(rows=None, meta={"dry_run": True, "note": "bigquery client not installed"})
@@ -40,6 +43,7 @@ async def run(sql: str, dry_run: bool = True) -> QueryResult:
             "job_id": getattr(job, "job_id", None),
             "location": getattr(job, "location", None),
         }
+        logger.info("stage=execute result bytes=%s cost=%s", total_bytes, meta["estimated_cost_usd"])
         return QueryResult(rows=None, meta=meta)
 
     # Execute query
@@ -53,10 +57,13 @@ async def run(sql: str, dry_run: bool = True) -> QueryResult:
         "total_bytes_processed": getattr(job, "total_bytes_processed", None),
         "billing_tier": getattr(job, "billing_tier", None),
     }
+    logger.info("stage=execute result rows=%s job_id=%s", len(rows), meta["job_id"])
     return QueryResult(rows=rows, meta=meta)
 
 
 async def materialize(sql: str) -> QueryResult:
+    logger = get_logger("pipeline.exec")
+    logger.info("stage=materialize start")
     if bigquery is None:
         return QueryResult(rows=None, meta={"materialized": False, "error": "bigquery client not installed"})
     dataset = getattr(settings, "bq_materialize_dataset", None)
@@ -80,4 +87,5 @@ async def materialize(sql: str) -> QueryResult:
         client.update_table(table, ["expires"])  # type: ignore
     except Exception:
         pass
+    logger.info("stage=materialize end table=%s", destination)
     return QueryResult(rows=None, meta={"materialized": True, "table": destination})
