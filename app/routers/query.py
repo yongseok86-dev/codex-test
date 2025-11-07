@@ -22,6 +22,7 @@ class QueryRequest(BaseModel):
     use_llm: bool | None = None
     llm_provider: str | None = None  # 'openai' | 'claude' | 'gemini'
     materialize: bool | None = None
+    conversation_id: str | None = None
 
 
 class QueryResponse(BaseModel):
@@ -37,19 +38,33 @@ async def query(req: QueryRequest) -> QueryResponse:
     if not req.q or len(req.q.strip()) < 2:
         raise HTTPException(status_code=400, detail="query text 'q' is required")
 
+    # 0) Normalize
+    from app.services import normalize, context
+    norm_q, norm_meta = normalize.normalize(req.q)
+    ctx = context.get_context(req.conversation_id or "")
+
     # 1) NLU
-    intent, slots = nlu.extract(req.q)
+    intent, slots = nlu.extract(norm_q)
     # 2) Plan
     plan = planner.make_plan(intent=intent, slots=slots)
+    plan["slots"] = slots
     # 3) SQL Generation (LLM or rule-based)
     if req.use_llm:
         try:
-            sql = generate_sql_via_llm(req.q, provider=req.llm_provider)
+            sql = generate_sql_via_llm(norm_q, provider=req.llm_provider)
         except Exception as e:
             logger.warning(f"LLM provider failed, falling back to rule-based: {e}")
             sql = sqlgen.generate(plan, limit=req.limit)
     else:
         sql = sqlgen.generate(plan, limit=req.limit)
+
+    # Optional: schema linking
+    from app.services import linking, guard
+    linking_info = linking.schema_link(norm_q)
+    try:
+        guard.parse_sql(sql)
+    except Exception as e:
+        logger.warning(f"SQL parse failed: {e}")
     # 4) Guardrails/Validation (lint + pipeline)
     validator.ensure_safe(sql)
     report = run_pipeline(sql, perform_execute=False, plan=plan)
@@ -71,6 +86,15 @@ async def query(req: QueryRequest) -> QueryResponse:
 
     meta = result.meta or {}
     meta["validation_steps"] = [s.__dict__ for s in report.steps]
+    meta["linking"] = linking_info
+    meta["normalized"] = norm_meta
+    # Optional summary
+    from app.services import summarize
+    meta["summary"] = summarize.summarize(result.rows, meta)
+
+    # Update context
+    context.update_context(req.conversation_id or "", {"last_sql": sql, "last_plan": plan})
+
     return QueryResponse(sql=sql, dry_run=dry, rows=result.rows, metadata=meta)
 
 

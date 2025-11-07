@@ -1,0 +1,8 @@
+# 컬럼/도메인 별칭 사전
+# 한국어 별칭 → 실제 컬럼 경로 예시
+주문일: order.order_date
+채널: session.source_medium
+랜딩페이지: session.landing_page
+구매건수: order.orders
+매출액: order.gmv
+
