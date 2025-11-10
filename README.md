@@ -888,11 +888,11 @@ sequenceDiagram
     API-->>ChatView: event: sql
 
     Note over API: 6. 스키마 링킹 (하이브리드)
-    API->>LINK: schema linking(question, use_llm=True)
+    API->>LINK: match schema elements
     LINK->>LINK: token based matching<br/>토큰 + 별칭 + 동의어 매칭
 
     alt confidence < 0.6
-        LINK->>LLM: call openai for linking(prompt)<br/>"스키마 요소 매칭"
+        LINK->>LLM: llm based matching<br/>"스키마 요소 매칭"
         LLM-->>LINK: {candidates, confidence} JSON
     end
 
@@ -1127,18 +1127,18 @@ sequenceDiagram
     S8-->>S1: cleaned SQL
     S1-->>Q: final SQL
 
-    Q->>L1: schema linking(question, use_llm=True)
-    L1->>L2: token based(question)
-    L2-->>L1: {candidates, confidence}
+    Q->>L1: match schema
+    L1->>L2: token based
+    L2-->>L1: results
 
     alt confidence < 0.6
-        L1->>L3: llm based(question)
+        L1->>L3: llm based
         L3->>BQ: LLM API call
-        BQ-->>L3: {candidates, confidence}
+        BQ-->>L3: results
         L3-->>L1: LLM result
     end
 
-    L1-->>Q: {candidates, confidence, method}
+    L1-->>Q: final results
 
     Q->>V1: ensure_safe(sql)
     V1->>V3: _load_policy()
@@ -1215,28 +1215,28 @@ flowchart TD
     Prompt --> LLMSQL[5c. call openai<br/>LLM 호출]
     LLMSQL --> PostProcess[5d. post process<br/>정리]
 
-    PostProcess --> LinkToken[6. linking token based<br/>토큰 + 별칭 매칭]
+    PostProcess --> LinkToken[6. schema matching token<br/>토큰 + 별칭 매칭]
 
     LinkToken --> LinkConf{신뢰도 >= 0.6?}
 
-    LinkConf -->|Yes| Guard[7. guard parse sql<br/>SQLGlot 파싱]
-    LinkConf -->|No| LinkLLM[6b. linking llm based<br/>LLM 호출]
+    LinkConf -->|Yes| Guard[7. guard parse<br/>SQLGlot 파싱]
+    LinkConf -->|No| LinkLLM[6b. schema matching llm<br/>LLM 호출]
 
     LinkLLM --> Guard
 
-    Guard --> Safe[8. validator ensure safe<br/>가드레일]
-    Safe --> Lint[9. validator lint<br/>품질 검사]
+    Guard --> Safe[8. ensure safe<br/>가드레일]
+    Safe --> Lint[9. lint check<br/>품질 검사]
 
-    Lint --> Pipeline[10. validation run pipeline<br/>6단계 검증]
+    Lint --> Pipeline[10. run validation<br/>6단계 검증]
 
-    Pipeline --> Pipe1[10a. lint sql]
-    Pipe1 --> Pipe2[10b. dry run]
+    Pipeline --> Pipe1[10a. lint]
+    Pipe1 --> Pipe2[10b. dryrun]
     Pipe2 --> Pipe3[10c. explain]
-    Pipe3 --> Pipe4[10d. schema]
-    Pipe4 --> Pipe5[10e. canary]
-    Pipe5 --> Pipe6[10f. domain assertions]
+    Pipe3 --> Pipe4[10d. get schema]
+    Pipe4 --> Pipe5[10e. canary test]
+    Pipe5 --> Pipe6[10f. assertions]
 
-    Pipe6 --> Execute[11. executor run<br/>BigQuery 실행]
+    Pipe6 --> Execute[11. execute query<br/>BigQuery 실행]
 
     Execute --> Summarize[12. summarize<br/>결과 요약]
 
