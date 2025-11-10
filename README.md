@@ -888,11 +888,11 @@ sequenceDiagram
     API-->>ChatView: event: sql
 
     Note over API: 6. 스키마 링킹 (하이브리드)
-    API->>LINK: schema_link(question, use_llm=True)
-    LINK->>LINK: _schema_link_token_based()<br/>토큰 + 별칭 + 동의어 매칭
+    API->>LINK: schema linking(question, use_llm=True)
+    LINK->>LINK: token based matching<br/>토큰 + 별칭 + 동의어 매칭
 
     alt confidence < 0.6
-        LINK->>LLM: _call_openai_for_linking(prompt)<br/>"스키마 요소 매칭"
+        LINK->>LLM: call openai for linking(prompt)<br/>"스키마 요소 매칭"
         LLM-->>LINK: {candidates, confidence} JSON
     end
 
@@ -1127,18 +1127,18 @@ sequenceDiagram
     S8-->>S1: cleaned SQL
     S1-->>Q: final SQL
 
-    Q->>LINK: schema_link(question, use_llm=True)
-    LINK->>L2: _schema_link_token_based(question)
-    L2-->>LINK: {candidates, confidence}
+    Q->>L1: schema linking(question, use_llm=True)
+    L1->>L2: token based(question)
+    L2-->>L1: {candidates, confidence}
 
     alt confidence < 0.6
-        LINK->>L3: _schema_link_llm_based(question)
+        L1->>L3: llm based(question)
         L3->>BQ: LLM API call
         BQ-->>L3: {candidates, confidence}
-        L3-->>LINK: LLM result
+        L3-->>L1: LLM result
     end
 
-    LINK-->>Q: {candidates, confidence, method}
+    L1-->>Q: {candidates, confidence, method}
 
     Q->>V1: ensure_safe(sql)
     V1->>V3: _load_policy()
@@ -1199,54 +1199,54 @@ sequenceDiagram
 flowchart TD
     Start([자연어 질문]) --> Normalize[1. normalize.normalize<br/>동의어 치환]
 
-    Normalize --> NLU_Keyword[2. nlu._extract_keyword_based<br/>키워드 매칭]
+    Normalize --> NLUKeyword[2. nlu keyword based<br/>키워드 매칭]
 
-    NLU_Keyword --> NLU_Conf{3. nlu._calculate_confidence<br/>신뢰도 >= 0.7?}
+    NLUKeyword --> NLUConf{3. nlu confidence<br/>신뢰도 >= 0.7?}
 
-    NLU_Conf -->|Yes| Plan[4. planner.make_plan<br/>빠른 처리]
-    NLU_Conf -->|No| NLU_LLM[3b. nlu._extract_llm_based<br/>LLM 호출]
+    NLUConf -->|Yes| Plan[4. planner make plan<br/>빠른 처리]
+    NLUConf -->|No| NLULLM[3b. nlu llm based<br/>LLM 호출]
 
-    NLU_LLM --> Plan
+    NLULLM --> Plan
 
-    Plan --> SQLGen[5. sqlgen.generate<br/>LLM SQL 생성]
+    Plan --> SQLGen[5. sqlgen generate<br/>LLM SQL 생성]
 
-    SQLGen --> TableSuffix[5a. _determine_table_suffix<br/>날짜 범위 계산]
-    TableSuffix --> Prompt[5b. _build_sql_generation_prompt<br/>시맨틱 모델 + GA4 스키마]
-    Prompt --> LLM_SQL[5c. _call_openai_for_sql<br/>LLM 호출]
-    LLM_SQL --> PostProcess[5d. _post_process_sql<br/>정리]
+    SQLGen --> TableSuffix[5a. determine suffix<br/>날짜 범위 계산]
+    TableSuffix --> Prompt[5b. build prompt<br/>시맨틱 모델 + GA4 스키마]
+    Prompt --> LLMSQL[5c. call openai<br/>LLM 호출]
+    LLMSQL --> PostProcess[5d. post process<br/>정리]
 
-    PostProcess --> Link_Token[6. linking._schema_link_token_based<br/>토큰 + 별칭 매칭]
+    PostProcess --> LinkToken[6. linking token based<br/>토큰 + 별칭 매칭]
 
-    Link_Token --> Link_Conf{신뢰도 >= 0.6?}
+    LinkToken --> LinkConf{신뢰도 >= 0.6?}
 
-    Link_Conf -->|Yes| Guard[7. guard.parse_sql<br/>SQLGlot 파싱]
-    Link_Conf -->|No| Link_LLM[6b. linking._schema_link_llm_based<br/>LLM 호출]
+    LinkConf -->|Yes| Guard[7. guard parse sql<br/>SQLGlot 파싱]
+    LinkConf -->|No| LinkLLM[6b. linking llm based<br/>LLM 호출]
 
-    Link_LLM --> Guard
+    LinkLLM --> Guard
 
-    Guard --> Safe[8. validator.ensure_safe<br/>가드레일]
-    Safe --> Lint[9. validator.lint<br/>품질 검사]
+    Guard --> Safe[8. validator ensure safe<br/>가드레일]
+    Safe --> Lint[9. validator lint<br/>품질 검사]
 
-    Lint --> Pipeline[10. validation.run_pipeline<br/>6단계 검증]
+    Lint --> Pipeline[10. validation run pipeline<br/>6단계 검증]
 
-    Pipeline --> Pipe1[10a. lint_sql]
-    Pipe1 --> Pipe2[10b. dry_run]
+    Pipeline --> Pipe1[10a. lint sql]
+    Pipe1 --> Pipe2[10b. dry run]
     Pipe2 --> Pipe3[10c. explain]
     Pipe3 --> Pipe4[10d. schema]
     Pipe4 --> Pipe5[10e. canary]
-    Pipe5 --> Pipe6[10f. domain_assertions]
+    Pipe5 --> Pipe6[10f. domain assertions]
 
-    Pipe6 --> Execute[11. executor.run<br/>BigQuery 실행]
+    Pipe6 --> Execute[11. executor run<br/>BigQuery 실행]
 
-    Execute --> Summarize[12. summarize.summarize<br/>결과 요약]
+    Execute --> Summarize[12. summarize<br/>결과 요약]
 
     Summarize --> Response([응답 반환])
 
-    style NLU_Keyword fill:#e1f5ff
-    style NLU_LLM fill:#fff4e1
-    style Link_Token fill:#e1f5ff
-    style Link_LLM fill:#fff4e1
-    style LLM_SQL fill:#ffe1f5
+    style NLUKeyword fill:#e1f5ff
+    style NLULLM fill:#fff4e1
+    style LinkToken fill:#e1f5ff
+    style LinkLLM fill:#fff4e1
+    style LLMSQL fill:#ffe1f5
     style Pipeline fill:#f0f0f0
 ```
 
