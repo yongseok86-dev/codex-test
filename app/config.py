@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     # Materialization
     bq_materialize_dataset: str | None = None  # e.g., project.dataset
     bq_materialize_expiration_hours: int = 24
+    # Default tables for behavioral features
+    bq_events_table: str = "`proj.mall.events`"
+    bq_users_table: str = "`proj.mall.users`"
+    bq_orders_table: str = "`proj.mall.orders`"
     # Logging to file (optional)
     log_file_path: str | None = None  # e.g., "logs/app.log" to enable
     log_max_bytes: int = 5_000_000

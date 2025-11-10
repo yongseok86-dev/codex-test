@@ -6,7 +6,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUpdated, nextTick } from 'vue'
-import { marked } from 'marked'
+import { marked, type MarkedOptions } from 'marked'
 import hljs from 'highlight.js'
 import DOMPurify from 'dompurify'
 import mermaid from 'mermaid'
@@ -38,13 +38,15 @@ renderer.code = (code, lang) => {
   }
 }
 
-marked.setOptions({
+const markedOptions: MarkedOptions & { headerIds?: boolean; mangle?: boolean } = {
   gfm: true,
   breaks: true,
   headerIds: false,
   mangle: false,
   renderer
-})
+}
+
+marked.setOptions(markedOptions)
 
 const rendered = computed(() => DOMPurify.sanitize(marked.parse(props.content)))
 
