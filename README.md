@@ -1,501 +1,1290 @@
-# codex-test
+# NL2SQL BigQuery Analytics Platform
 
-NL¡æSQL BigQuery ½Ã¸àÆ½ ·¹ÀÌ¾î ¿¡ÀÌÀüÆ® + ChatGPT ½ºÅ¸ÀÏ ÇÁ·±Æ®¿£µå.
-FastAPI(¹é¿£µå)¿Í Vite+Vue3(ÇÁ·±Æ®¿£µå)·Î ±¸¼ºµÇ¾î ÀÚ¿¬¾î ÁúÀÇ¸¦ SQL·Î º¯È¯ÇÏ°í ½ÇÇà/¿ä¾àÀ» Áö¿øÇÕ´Ï´Ù.
+**ìì—°ì–´ë¥¼ BigQuery SQLë¡œ ë³€í™˜í•˜ê³  ì‹¤í–‰í•˜ëŠ” ì—”í„°í”„ë¼ì´ì¦ˆê¸‰ ë¶„ì„ í”Œë«í¼**
 
-## ÇÁ·ÎÁ§Æ® ±¸¼º
-- `app/` ¹é¿£µå FastAPI
-  - `routers/` API ¶ó¿ìÆ® (`health.py`, `query.py` µî)
-  - `services/` ÄÚ¾î ·ÎÁ÷ (NLU/Planner/SQLGen/Validator/Executor/LLM/Prompt)
-  - `semantic/` ½Ã¸àÆ½ ¸ğµ¨ (`semantic.yml`, `metrics_definitions.yaml`, `golden_queries.yaml`)
-  - `guardrails.json` °¡µå·¹ÀÏ Á¤Ã¥(±İÄ¢¾î µî)
-- `frontend/` Vite + Vue3 UI (ChatGPT À¯»ç ÀÎÅÍ·¢¼Ç)
-- `tests/` PyTest ±âº» Å×½ºÆ®
-- `.github/` CI, PR ÅÛÇÃ¸´, CODEOWNERS
+FastAPI ë°±ì—”ë“œì™€ Vite+Vue3 í”„ë¡ íŠ¸ì—”ë“œë¡œ êµ¬ì„±ëœ í’€ìŠ¤íƒ NL2SQL ì†”ë£¨ì…˜ì…ë‹ˆë‹¤.
+LLM(OpenAI/Claude/Gemini)ê³¼ ì‹œë§¨í‹± ëª¨ë¸ì„ í™œìš©í•˜ì—¬ ì •í™•í•œ SQLì„ ìƒì„±í•˜ê³ ,
+6ë‹¨ê³„ ê²€ì¦ íŒŒì´í”„ë¼ì¸ì„ í†µí•´ ì•ˆì „í•˜ê²Œ ì‹¤í–‰í•©ë‹ˆë‹¤.
 
-## ¹é¿£µå(FastAPI)
-- ½ÇÇà: `uvicorn app.main:app --host 0.0.0.0 --port 8080`
-- API:
-  - `GET /healthz`, `GET /readyz`
-  - `POST /api/query` { q, limit?, dry_run?, use_llm? }
-  - `GET /api/query/stream?q=...&limit=...&dry_run=...&use_llm=...` (SSE: nlu ¡æ plan ¡æ sql ¡æ validated ¡æ result)
-- BigQuery:
-  - ±âº»Àº µå¶óÀÌ·±(`dry_run_only=true`)À¸·Î ºñ¿ë/¾ÈÀü º¸Àå
-  - ½ÇÁ¦ ½ÇÇà ½Ã GCP ÀÎÁõ°ú `gcp_project`, `bq_default_location` ÇÊ¿ä
-  - DRY RUN ¸ŞÅ¸: `total_bytes_processed`, `estimated_tb`, `estimated_cost_usd`
-- °¡µå·¹ÀÏ: `app/guardrails.json` ±âÁØÀ¸·Î ±İÄ¢¾î °Ë»ç(SELECT * µî)
+---
 
-## LLM ¼³Á¤(OpenAI ±âº», Claude/Gemini Áö¿ø)
-- `.env` ¿¹½Ã(·çÆ®ÀÇ `.env.example` ÂüÁ¶):
-  - `llm_provider=openai | claude | gemini`
-  - OpenAI: `openai_api_key`, `openai_model`(±âº» gpt-4o-mini)
-  - Claude: `anthropic_api_key`, `anthropic_model`
-  - Gemini: `gemini_api_key`, `gemini_model`
-- ÇÁ·ÒÇÁÆ®¿¡ ½Ã¸àÆ½ ·¹ÀÌ¾î/¸ŞÆ®¸¯/»çÀüÀ» ÁÖÀÔÇÏ¿© SQL Á¤È®µµ Çâ»ó
+## ğŸŒŸ ì£¼ìš” ê¸°ëŠ¥
 
-## ÇÁ·±Æ®¿£µå(Vite + Vue3)
-- ¼³Ä¡/½ÇÇà: `cd frontend && npm ci && npm run dev` (http://localhost:5173)
-- °³¹ß ÇÁ·Ï½Ã: `/api` ¡æ `http://localhost:8080` (`vite.config.ts`)
-- ±â´É:
-  - ChatGPT ½ºÅ¸ÀÏ ´ëÈ­, ½ºÆ®¸®¹Ö ÁøÇà(SSE), LLM Åä±Û, Dry Run/Limit Á¦¾î
-  - °á°ú ÆĞ³Î(ÆäÀÌÁö³×ÀÌ¼Ç/CSV ´Ù¿î·Îµå), ´ÙÅ© ¸ğµå
-  - °í±Ş ¸¶Å©´Ù¿î(¸ñ·Ï/Ç¥) + ÄÚµå ÇÏÀÌ¶óÀÌÆ® + ¼ö½Ä(KaTeX) + ´ÙÀÌ¾î±×·¥(Mermaid)
+### ğŸ¤– í•˜ì´ë¸Œë¦¬ë“œ LLM ì•„í‚¤í…ì²˜
+- **ë‹¤ì¤‘ LLM ì§€ì›**: OpenAI (gpt-4o-mini), Anthropic (Claude), Google (Gemini)
+- **í•˜ì´ë¸Œë¦¬ë“œ ì „ëµ**: ë¹ ë¥¸ í‚¤ì›Œë“œ ë§¤ì¹­ + LLM ë³´ì™„
+- **ë¹„ìš© ìµœì í™”**: ê°„ë‹¨í•œ ì§ˆë¬¸ì€ ë¬´ë£Œ, ë³µì¡í•œ ì§ˆë¬¸ë§Œ LLM ì‚¬ìš©
 
-## Å×½ºÆ®
-- `pytest -q`
+### ğŸ“Š ì‹œë§¨í‹± ëª¨ë¸ ê¸°ë°˜
+- **ì—”í‹°í‹°/ì°¨ì›/ì¸¡ì •í•­ëª©** ì •ì˜ë¡œ ì¼ê´€ëœ ë©”íŠ¸ë¦­ ê´€ë¦¬
+- **ë©”íŠ¸ë¦­ ì •ì˜**: SQL í‘œí˜„ì‹ ë° ê¸°ë³¸ í•„í„° ì¤‘ì•™ ê´€ë¦¬
+- **Few-shot í•™ìŠµ**: Golden queriesë¡œ SQL ìƒì„± í’ˆì§ˆ í–¥ìƒ
+- **ë™ì˜ì–´ ì§€ì›**: ë‹¤ì–‘í•œ í‘œí˜„ì„ í‘œì¤€ ìš©ì–´ë¡œ ìë™ ë³€í™˜
 
-## È¯°æ ÅÛÇÃ¸´
-- ·çÆ®ÀÇ `.env.example`¸¦ º¹»çÇØ `.env`·Î »ç¿ëÇÏ¼¼¿ä. GCP/BigQuery ¹× LLM(openai/claude/gemini) Å°¸¦ Ã¤¿î µÚ ¼­¹ö¸¦ Àç½ÃÀÛÇÏ¸é Àû¿ëµË´Ï´Ù.
+### ğŸ›¡ï¸ 6ë‹¨ê³„ ê²€ì¦ íŒŒì´í”„ë¼ì¸
+1. **Lint**: SQL í’ˆì§ˆ ê²€ì‚¬ (SELECT *, ì‹œê°„ í•„í„° ë“±)
+2. **Dry Run**: BigQuery êµ¬ë¬¸ ê²€ì¦ ë° ë¹„ìš© ì¶”ì •
+3. **Explain**: ì¿¼ë¦¬ ì‹¤í–‰ ê³„íš ë¶„ì„ (ì„ íƒì )
+4. **Schema**: ê²°ê³¼ ìŠ¤í‚¤ë§ˆ ì¶”ì¶œ (LIMIT 0)
+5. **Canary**: ìƒ˜í”Œ ì‹¤í–‰ìœ¼ë¡œ ëŸ°íƒ€ì„ ì˜¤ë¥˜ ê°ì§€
+6. **Domain Assertions**: ì‹œë§¨í‹± ëª¨ë¸ ê¸°ë°˜ ë¹„ì¦ˆë‹ˆìŠ¤ ê·œì¹™ ê²€ì¦
 
-- LLM ¼±ÅÃ: ÇÁ·±Æ®¿£µå¿¡¼­ Provider(OpenAI/Claude/Gemini)¸¸ ¼±ÅÃÇÕ´Ï´Ù. Å°/ÅäÅ«/Æ©´×(¿Âµµ, ÅäÅ«)Àº ¹é¿£µå .env ¼³Á¤À¸·Î °ü¸®ÇÏ¸ç, Á¦°øÀÚ È£Ãâ ½ÇÆĞ ½Ã ¼­¹ö ·Î±×¿¡ °æ°í¸¦ ³²±â°í ±ÔÄ¢ ±â¹İ SQL·Î ÀÚµ¿ Æú¹éÇÕ´Ï´Ù.
+### ğŸ”§ GA4 BigQuery Export íŠ¹í™”
+- **í…Œì´ë¸” ì„œí”½ìŠ¤ ìë™ ì²˜ë¦¬**: `events_*` + `_TABLE_SUFFIX` ì¡°ê±´
+- **ë„¤ìŠ¤í‹°ë“œ í•„ë“œ ì§€ì›**: `device.category`, `geo.country` ë“±
+- **ì‹œê°„ ë²”ìœ„ ìë™ ê³„ì‚°**: "ì§€ë‚œ 7ì¼" â†’ `BETWEEN '20251031' AND '20251107'`
+- **GA4 ìŠ¤í‚¤ë§ˆ í†µí•©**: ê³µì‹ ìŠ¤í‚¤ë§ˆ ì •ë³´ í”„ë¡¬í”„íŠ¸ì— í¬í•¨
 
+### ğŸ’¬ ëŒ€í™”í˜• ì¸í„°í˜ì´ìŠ¤
+- **ChatGPT ìŠ¤íƒ€ì¼ UI**: ìì—°ì–´ ëŒ€í™” ê¸°ë°˜
+- **ì‹¤ì‹œê°„ ìŠ¤íŠ¸ë¦¬ë°**: SSEë¡œ íŒŒì´í”„ë¼ì¸ ì§„í–‰ìƒí™© ì‹¤ì‹œê°„ í‘œì‹œ
+- **ì»¨í…ìŠ¤íŠ¸ ìœ ì§€**: ì´ì „ ëŒ€í™” ë‚´ìš© ì°¸ì¡° ê°€ëŠ¥
+- **ë§ˆí¬ë‹¤ìš´ ì§€ì›**: ê²°ê³¼ë¥¼ í‘œ/ì°¨íŠ¸ë¡œ ì‹œê°í™”
 
-- °ËÁõ Èå¸§: ±ÔÄ¢ ¸°ÆÃ ¡æ DRY RUN ¡æ EXPLAIN ¡æ LIMIT 0 ½ºÅ°¸¶ ¡æ Ä«³ª¸®¾Æ ¡æ µµ¸ŞÀÎ ±ÔÄ¢ ¡æ ÀüÃ¼ ½ÇÇà/¸ÓÆ¼ºä.
+### ğŸ”’ ë³´ì•ˆ ë° ë¹„ìš© ê´€ë¦¬
+- **ê°€ë“œë ˆì¼ ì •ì±…**: DELETE, UPDATE, INSERT, DROP ì°¨ë‹¨
+- **ë¹„ìš© ì œí•œ**: `maximum_bytes_billed` ì„¤ì •
+- **Dry Run ëª¨ë“œ**: ì‹¤ì œ ì‹¤í–‰ ì—†ì´ ë¹„ìš© ì¶”ì •
+- **ì¿¼ë¦¬ êµ¬ì²´í™”**: ìì£¼ ì‚¬ìš©í•˜ëŠ” ì¿¼ë¦¬ ê²°ê³¼ ìºì‹±
 
-- ½ÇÇà ¿É¼Ç: REST ¹Ùµğ `materialize: true` ·Î °á°ú¸¦ BigQuery Å×ÀÌºí·Î ¸ÓÆ¼¸®¾ó¶óÀÌÁî(¸¸·á½Ã°£ ±âº» 24h, .env ¼³Á¤).
+---
 
-- ½Ã¸àÆ½ Å×ÀÌºí °æ·Î ¿À¹ö¶óÀÌµå: `app/semantic/datasets.yaml`¿¡ ¿£Æ¼Æ¼º° BigQuery Å×ÀÌºíÀ» ¸ÅÇÎÇÏ¸é ÇÁ·ÒÇÁÆ®¿Í °ËÁõ¿¡¼­ ÇØ´ç °æ·Î·Î »ç¿ëµË´Ï´Ù.
+## ğŸ“ í”„ë¡œì íŠ¸ êµ¬ì¡°
 
-- LLM ÇÁ·ÒÇÁÆ®ÀÇ few-shot: golden_queries.yaml¿¡¼­ ÀÚ¿¬¾î À¯»çµµ°¡ ³ôÀº ¿¹½Ã(NL/intent/slots)¸¦ ÀÚµ¿ Æ÷ÇÔÇØ SQL Ç°ÁúÀ» ³ôÀÔ´Ï´Ù.
-## ÇÁ·ÎÁ§Æ® Æú´õ/ÆÄÀÏ ±¸¼º
 ```
-.
-¦§¦¡ app/
-¦¢  ¦§¦¡ bq/connector.py            # BigQuery Å¬¶óÀÌ¾ğÆ®/QueryJobConfig ÇïÆÛ
-¦¢  ¦§¦¡ config.py                  # Settings(.env): GCP/LLM/¸ÓÆ¼¸®¾ó¶óÀÌÁî/Æ©´×
-¦¢  ¦§¦¡ deps.py                    # get_logger()
-¦¢  ¦§¦¡ main.py                    # FastAPI ¾Û ÆÑÅä¸®/¹Ìµé¿ş¾î
-¦¢  ¦§¦¡ routers/
-¦¢  ¦¢  ¦§¦¡ health.py               # /healthz, /readyz
-¦¢  ¦¢  ¦¦¦¡ query.py                # /api/query, /api/query/stream (SSE)
-¦¢  ¦§¦¡ semantic/
-¦¢  ¦¢  ¦§¦¡ semantic.yml            # ¿£Æ¼Æ¼/Â÷¿ø/ÁöÇ¥/¾îÈÖ
-¦¢  ¦¢  ¦§¦¡ metrics_definitions.yaml# ¸ŞÆ®¸¯ Á¤ÀÇ+±âº»ÇÊÅÍ
-¦¢  ¦¢  ¦§¦¡ golden_queries.yaml     # ÇÑ±¹¾î °ñµçÄõ¸®
-¦¢  ¦¢  ¦§¦¡ datasets.yaml           # ¿£Æ¼Æ¼¡æBQ Å×ÀÌºí ¸ÅÇÎ
-¦¢  ¦¢  ¦¦¦¡ loader.py               # ½Ã¸àÆ½ ·Î´õ/¿À¹ö¶óÀÌµå Àû¿ë
-¦¢  ¦§¦¡ services/
-¦¢  ¦¢  ¦§¦¡ nlu.py                  # extract()
-¦¢  ¦¢  ¦§¦¡ planner.py              # make_plan()
-¦¢  ¦¢  ¦§¦¡ sqlgen.py               # generate() ±ÔÄ¢±â¹İ SQL
-¦¢  ¦¢  ¦§¦¡ validator.py            # ensure_safe(), lint()
-¦¢  ¦¢  ¦§¦¡ validation.py           # lint¡ædry_run¡æexplain¡æschema¡æcanary¡æassertions
-¦¢  ¦¢  ¦§¦¡ executor.py             # run(), materialize()
-¦¢  ¦¢  ¦§¦¡ prompt.py               # build_sql_prompt() + few-shot
-¦¢  ¦¢  ¦¦¦¡ llm.py                  # generate_sql_via_llm()
-¦¢  ¦¦¦¡ utils/timeparse.py         # last_n_days_utc()
-¦§¦¡ frontend/
-¦¢  ¦§¦¡ index.html
-¦¢  ¦§¦¡ vite.config.ts             # /api ÇÁ·Ï½Ã
-¦¢  ¦§¦¡ package.json
-¦¢  ¦¦¦¡ src/
-¦¢     ¦§¦¡ App.vue                 # ·¹ÀÌ¾Æ¿ô/´ÙÅ©¸ğµå/È÷½ºÅä¸®
-¦¢     ¦§¦¡ main.ts                 # ºÎÆ®½ºÆ®·¦(CSS Æ÷ÇÔ)
-¦¢     ¦§¦¡ views/ChatView.vue      # ½ºÆ®¸®¹Ö/LLM Åä±Û/Àü¼Û ·ÎÁ÷
-¦¢     ¦§¦¡ components/
-¦¢     ¦¢  ¦§¦¡ ChatInput.vue        # ÀÔ·Â/Àü¼Û
-¦¢     ¦¢  ¦§¦¡ ChatMessage.vue      # MD/KaTeX/Mermaid ·»´õ
-¦¢     ¦¢  ¦¦¦¡ ResultPanel.vue      # Å×ÀÌºí/ÆäÀÌÁö³×ÀÌ¼Ç/CSV
-¦¢     ¦¦¦¡ store/chat.ts           # ´ëÈ­ ÀúÀå/º¹¿ø
-¦§¦¡ tests/                        # ±âº» Å×½ºÆ®
-¦§¦¡ .github/                      # CI/PR/CODEOWNERS
-¦¦¦¡ AGENTS.md, README.md, .env.example
+f:\codex\codex1\
+â”œâ”€â”€ app/                           # FastAPI ë°±ì—”ë“œ
+â”‚   â”œâ”€â”€ main.py                   # ì• í”Œë¦¬ì¼€ì´ì…˜ ì§„ì…ì 
+â”‚   â”œâ”€â”€ config.py                 # í™˜ê²½ ì„¤ì • (Pydantic)
+â”‚   â”œâ”€â”€ deps.py                   # ë¡œê¹… ì„¤ì •
+â”‚   â”œâ”€â”€ guardrails.json           # ë³´ì•ˆ ì •ì±…
+â”‚   â”‚
+â”‚   â”œâ”€â”€ routers/                  # API ì—”ë“œí¬ì¸íŠ¸
+â”‚   â”‚   â”œâ”€â”€ health.py             # /healthz, /readyz
+â”‚   â”‚   â””â”€â”€ query.py              # /api/query, /api/query/stream
+â”‚   â”‚
+â”‚   â”œâ”€â”€ services/                 # ë¹„ì¦ˆë‹ˆìŠ¤ ë¡œì§ (12ë‹¨ê³„ íŒŒì´í”„ë¼ì¸)
+â”‚   â”‚   â”œâ”€â”€ normalize.py          # í…ìŠ¤íŠ¸ ì •ê·œí™”
+â”‚   â”‚   â”œâ”€â”€ context.py            # ëŒ€í™” ì»¨í…ìŠ¤íŠ¸ ê´€ë¦¬
+â”‚   â”‚   â”œâ”€â”€ nlu.py                # ìì—°ì–´ ì´í•´ (í•˜ì´ë¸Œë¦¬ë“œ)
+â”‚   â”‚   â”œâ”€â”€ planner.py            # ì¿¼ë¦¬ ê³„íš ìƒì„±
+â”‚   â”‚   â”œâ”€â”€ sqlgen.py             # LLM ê¸°ë°˜ SQL ìƒì„± (ì‹ ê·œ)
+â”‚   â”‚   â”œâ”€â”€ llm.py                # LLM SQL ìƒì„± (ë ˆê±°ì‹œ)
+â”‚   â”‚   â”œâ”€â”€ prompt.py             # LLM í”„ë¡¬í”„íŠ¸ ë¹Œë”
+â”‚   â”‚   â”œâ”€â”€ linking.py            # ìŠ¤í‚¤ë§ˆ ë§í‚¹ (í•˜ì´ë¸Œë¦¬ë“œ)
+â”‚   â”‚   â”œâ”€â”€ guard.py              # SQL íŒŒì‹± (SQLGlot)
+â”‚   â”‚   â”œâ”€â”€ validator.py          # ë³´ì•ˆ ê²€ì‚¬ ë° ë¦°íŠ¸
+â”‚   â”‚   â”œâ”€â”€ validation.py         # 6ë‹¨ê³„ ê²€ì¦ íŒŒì´í”„ë¼ì¸
+â”‚   â”‚   â”œâ”€â”€ repair.py             # LLM ê¸°ë°˜ ì˜¤ë¥˜ ìˆ˜ì •
+â”‚   â”‚   â”œâ”€â”€ executor.py           # BigQuery ì‹¤í–‰
+â”‚   â”‚   â”œâ”€â”€ summarize.py          # ê²°ê³¼ ìš”ì•½
+â”‚   â”‚   â””â”€â”€ templates.py          # í…œí”Œë¦¿ SQL
+â”‚   â”‚
+â”‚   â”œâ”€â”€ bq/                       # BigQuery í†µí•©
+â”‚   â”‚   â””â”€â”€ connector.py          # BigQuery í´ë¼ì´ì–¸íŠ¸ ë˜í¼
+â”‚   â”‚
+â”‚   â”œâ”€â”€ schema/                   # ìŠ¤í‚¤ë§ˆ ê´€ë¦¬
+â”‚   â”‚   â”œâ”€â”€ catalog.py            # í…Œì´ë¸”/ì»¬ëŸ¼ ì¹´íƒˆë¡œê·¸ (ìºì‹±)
+â”‚   â”‚   â””â”€â”€ aliases.yaml          # í•œì˜ ì»¬ëŸ¼ ë³„ì¹­ ë§¤í•‘
+â”‚   â”‚
+â”‚   â”œâ”€â”€ semantic/                 # ì‹œë§¨í‹± ëª¨ë¸ (í•µì‹¬!)
+â”‚   â”‚   â”œâ”€â”€ semantic.yml          # ì—”í‹°í‹°/ì°¨ì›/ì¸¡ì •í•­ëª© ì •ì˜
+â”‚   â”‚   â”œâ”€â”€ metrics_definitions.yaml  # ë©”íŠ¸ë¦­ ê³µì‹ ë° í•„í„°
+â”‚   â”‚   â”œâ”€â”€ golden_queries.yaml   # Few-shot ì˜ˆì œ
+â”‚   â”‚   â”œâ”€â”€ datasets.yaml         # í…Œì´ë¸”ëª… ì˜¤ë²„ë¼ì´ë“œ
+â”‚   â”‚   â”œâ”€â”€ ga4_schema.yaml       # GA4 ìŠ¤í‚¤ë§ˆ ì •ì˜
+â”‚   â”‚   â””â”€â”€ loader.py             # YAML ë¡œë”
+â”‚   â”‚
+â”‚   â””â”€â”€ utils/
+â”‚       â””â”€â”€ timeparse.py          # ë‚ ì§œ/ì‹œê°„ ìœ í‹¸ë¦¬í‹°
+â”‚
+â”œâ”€â”€ frontend/                     # Vite + Vue3 í”„ë¡ íŠ¸ì—”ë“œ
+â”‚   â”œâ”€â”€ index.html
+â”‚   â”œâ”€â”€ vite.config.ts            # /api í”„ë¡ì‹œ ì„¤ì •
+â”‚   â”œâ”€â”€ package.json
+â”‚   â””â”€â”€ src/
+â”‚       â”œâ”€â”€ App.vue               # ë©”ì¸ ë ˆì´ì•„ì›ƒ
+â”‚       â”œâ”€â”€ main.ts               # ì—”íŠ¸ë¦¬í¬ì¸íŠ¸
+â”‚       â”œâ”€â”€ views/
+â”‚       â”‚   â””â”€â”€ ChatView.vue      # ì±„íŒ… ì¸í„°í˜ì´ìŠ¤
+â”‚       â”œâ”€â”€ components/
+â”‚       â”‚   â”œâ”€â”€ ChatInput.vue     # ì…ë ¥ ì»´í¬ë„ŒíŠ¸
+â”‚       â”‚   â”œâ”€â”€ ChatMessage.vue   # ë§ˆí¬ë‹¤ìš´ ë Œë”ë§ (KaTeX, Mermaid)
+â”‚       â”‚   â””â”€â”€ ResultPanel.vue   # ê²°ê³¼ í…Œì´ë¸” (í˜ì´ì§€ë„¤ì´ì…˜, CSV)
+â”‚       â””â”€â”€ store/
+â”‚           â””â”€â”€ chat.ts           # ëŒ€í™” ìƒíƒœ ê´€ë¦¬
+â”‚
+â”œâ”€â”€ tests/                        # í…ŒìŠ¤íŠ¸ ìŠ¤ìœ„íŠ¸
+â”‚   â”œâ”€â”€ test_health.py
+â”‚   â”œâ”€â”€ test_query_stub.py
+â”‚   â””â”€â”€ test_stream_sse.py
+â”‚
+â”œâ”€â”€ scripts/                      # ìœ í‹¸ë¦¬í‹° ìŠ¤í¬ë¦½íŠ¸
+â”‚   â””â”€â”€ stream_demo.py            # SSE ìŠ¤íŠ¸ë¦¬ë° í…ŒìŠ¤íŠ¸
+â”‚
+â”œâ”€â”€ docs/                         # ë¬¸ì„œ
+â”‚   â””â”€â”€ validation_architecture.md  # ê²€ì¦ ì•„í‚¤í…ì²˜ ì„¤ëª…
+â”‚
+â”œâ”€â”€ logs/                         # ë¡œê·¸ íŒŒì¼ (ìë™ ìƒì„±)
+â”‚   â””â”€â”€ app.log
+â”‚
+â”œâ”€â”€ pyproject.toml                # Python ì˜ì¡´ì„±
+â”œâ”€â”€ .env.example                  # í™˜ê²½ë³€ìˆ˜ í…œí”Œë¦¿
+â”œâ”€â”€ .env                          # í™˜ê²½ë³€ìˆ˜ (gitignore)
+â”œâ”€â”€ backend_analysis_report.md    # ë°±ì—”ë“œ ë¶„ì„ ë³´ê³ ì„œ
+â””â”€â”€ README.md                     # ì´ íŒŒì¼
 ```
 
-## ÆÄÀÏº° ÇÔ¼ö/Å¬·¡½º °³¿ä(°£´Ü ÁÖ¼®)
-- app/config.py
-  - class Settings: GCP(BigQuery)/LLM(API Key, ¸ğµ¨, ¿Âµµ/ÅäÅ«/½Ã½ºÅÛÇÁ·ÒÇÁÆ®)/¸ÓÆ¼¸®¾ó¶óÀÌÁî ¼³Á¤
-- app/deps.py
-  - get_logger(name, level): ±¸Á¶È­/½ºÆ®¸² ·Î°Å »ı¼º
-- app/main.py
-  - create_app(): FastAPI ¾Û ±¸¼º, ¶ó¿ìÅÍ/¹Ìµé¿ş¾î µî·Ï
-- app/routers/health.py
-  - healthz(), readyz(): »óÅÂ Á¡°Ë ¿£µåÆ÷ÀÎÆ®
-- app/routers/query.py
-  - class QueryRequest/QueryResponse: ¿äÃ»/ÀÀ´ä ¸ğµ¨
-  - query(req): NLU¡æPlan¡æSQL(LLM/±ÔÄ¢)¡æ°ËÁõÆÄÀÌÇÁ¶óÀÎ¡æ½ÇÇà/¸ÓÆ¼¸®¾ó¶óÀÌÁî
-  - query_stream(...): À§ Èå¸§À» SSE ÀÌº¥Æ®(nlu/plan/sql/validated/check/result)·Î ½ºÆ®¸®¹Ö
-- app/services/nlu.py
-  - extract(q): ÀÇµµ/½½·Ô(¸ŞÆ®¸¯/±â°£ ÈùÆ®) ÃßÃâ(ÈŞ¸®½ºÆ½)
-- app/services/planner.py
-  - make_plan(intent, slots): ±âº» grain/metric º¸Á¤, °èÈ¹ »ı¼º
-- app/services/sqlgen.py
-  - generate(plan, limit): BigQuery ¹æ¾ğ ±ÔÄ¢ ±â¹İ SQL »ı¼º
-- app/services/validator.py
-  - ensure_safe(sql): º¯Çü/SELECT * ±İÁö µî °¡µå·¹ÀÏ °Ë»ç
-  - lint(sql): ½Ã°£ÇÊÅÍ/SELECT * µî ¸°Æ® ÀÌ½´ ¹İÈ¯
-- app/services/validation.py
-  - StepResult, ValidationReport: ´Ü°è °á°ú/¸®Æ÷Æ® ¸ğµ¨
-  - lint_sql(), dry_run(), explain(), schema(), canary(): ´Ü°èº° °ËÁõ ¼öÇà
-  - domain_assertions(sql, plan): ½Ã¸àÆ½/¸ŞÆ®¸¯ ±â¹İ µµ¸ŞÀÎ ±ÔÄ¢ °Ë»ç
-  - run_pipeline(sql, perform_execute, plan): ±ÇÀå °ËÁõ Èå¸§ ½ÇÇà
-- app/services/executor.py
-  - class QueryResult: rows/meta ÄÁÅ×ÀÌ³Ê
-  - run(sql, dry_run): DRY RUN/½ÇÇà ¹× ¸ŞÅ¸(ºñ¿ëÃßÁ¤ µî) ¹İÈ¯
-  - materialize(sql): ¼³Á¤µÈ µ¥ÀÌÅÍ¼Â¿¡ °á°ú Å×ÀÌºí »ı¼º(¸¸·á½Ã°£ ¼³Á¤)
-- app/services/prompt.py
-  - build_sql_prompt(question, semantic): ½Ã¸àÆ½/¸ŞÆ®¸¯/¾îÈÖ+°ñµçÄõ¸® few-shot Æ÷ÇÔ ÇÁ·ÒÇÁÆ®
-- app/services/llm.py
-  - generate_sql_via_llm(question, provider): OpenAI/Claude/Gemini·Î SQL »ı¼º, ÄÚµåÆæ½º¿¡¼­ ÃßÃâ
-- app/semantic/loader.py
-  - load_semantic_root(): ½Ã¸àÆ½/¸ŞÆ®¸¯/°ñµçÄõ¸® ·Îµù
-  - load_datasets_overrides(): datasets.yaml ÀĞ±â
-  - apply_table_overrides(model, overrides): ¿£Æ¼Æ¼ Å×ÀÌºí °æ·Î Ä¡È¯
-- app/bq/connector.py
-  - available(), client(), base_job_config(), run_query(): BigQuery ½ÇÇà ÇïÆÛ
-- app/utils/timeparse.py
-  - last_n_days_utc(n): ÃÖ±Ù nÀÏ UTC ±¸°£ ¹İÈ¯
-- frontend/src/views/ChatView.vue
-  - onSend(text): REST/SSE·Î ÁúÀÇ Àü¼Û, LLM/½ºÆ®¸®¹Ö/µå¶óÀÌ·±/¸®¹Ô ¹İ¿µ
-  - clear(): ¾È³» ¸Ş½ÃÁö Ãâ·Â(»õ Ã¤ÆÃ À¯µµ)
-- frontend/src/components/ChatMessage.vue
-  - rendered(computed): marked+KaTeX+Mermaid ·»´õ, DOMPurify·Î sanitize
-- frontend/src/components/ResultPanel.vue
-  - columns/paged(computed), downloadCsv(): °á°ú Ç¥ ·»´õ/CSV ÀúÀå, ÆäÀÌÁö³×ÀÌ¼Ç
-- frontend/src/components/ChatInput.vue
-  - emitSend(): ¿£ÅÍ/¹öÆ° Àü¼Û
-- frontend/src/store/chat.ts
-  - types(Role/Message/Result/Conversation), newConversation(), selectConversation(), addMessage(), setResult(): ·ÎÄÃ½ºÅä¸®Áö ÀúÀå/º¹¿ø
-## Sequence Diagram
+---
+
+## ğŸš€ ë¹ ë¥¸ ì‹œì‘
+
+### 1. í™˜ê²½ ì„¤ì •
+
+```bash
+# .env íŒŒì¼ ìƒì„±
+cp .env.example .env
+
+# .env íŒŒì¼ í¸ì§‘ (í•„ìˆ˜)
+# - GCP í”„ë¡œì íŠ¸ ì„¤ì •
+# - LLM API í‚¤ ì„¤ì • (ìµœì†Œ 1ê°œ)
+```
+
+**.env ì˜ˆì‹œ**:
+```bash
+# í™˜ê²½
+env=dev
+gcp_project=your-gcp-project-id
+bq_default_location=asia-northeast3
+
+# LLM í”„ë¡œë°”ì´ë” (openai, claude, gemini ì¤‘ ì„ íƒ)
+llm_provider=openai
+
+# OpenAI ì„¤ì •
+openai_api_key=sk-...
+openai_model=gpt-4o-mini
+
+# BigQuery ì„¤ì •
+dry_run_only=true
+maximum_bytes_billed=1000000000
+
+# ë¡œê¹…
+log_file_path=logs/app.log
+log_rotation=daily
+```
+
+### 2. ë°±ì—”ë“œ ì‹¤í–‰
+
+```bash
+# ê°€ìƒí™˜ê²½ ìƒì„± ë° í™œì„±í™”
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# ì˜ì¡´ì„± ì„¤ì¹˜
+pip install -e .
+
+# ì„œë²„ ì‹¤í–‰
+uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+```
+
+**ì„œë²„ ì‹¤í–‰ í™•ì¸**:
+```bash
+curl http://localhost:8080/healthz
+# {"status":"ok"}
+```
+
+### 3. í”„ë¡ íŠ¸ì—”ë“œ ì‹¤í–‰ (ì„ íƒì )
+
+```bash
+cd frontend
+
+# ì˜ì¡´ì„± ì„¤ì¹˜
+npm install
+
+# ê°œë°œ ì„œë²„ ì‹¤í–‰
+npm run dev
+# â†’ http://localhost:5173
+```
+
+### 4. í…ŒìŠ¤íŠ¸
+
+```bash
+# Python í…ŒìŠ¤íŠ¸
+pytest -q
+
+# SSE ìŠ¤íŠ¸ë¦¬ë° í…ŒìŠ¤íŠ¸
+python scripts/stream_demo.py
+```
+
+---
+
+## ğŸ“¡ API ì—”ë“œí¬ì¸íŠ¸
+
+### Health Check
+
+```bash
+GET /healthz
+GET /readyz
+```
+
+### Query (ë™ê¸°ì‹)
+
+```bash
+POST /api/query
+Content-Type: application/json
+
+{
+  "q": "ì§€ë‚œ 7ì¼ ë””ë°”ì´ìŠ¤ë³„ ë°©ë¬¸ì ìˆ˜",
+  "limit": 100,
+  "dry_run": true,
+  "use_llm": true,
+  "llm_provider": "openai",
+  "conversation_id": "session_123",
+  "materialize": false
+}
+```
+
+**ì‘ë‹µ**:
+```json
+{
+  "sql": "SELECT device.category, COUNT(DISTINCT user_pseudo_id) AS users...",
+  "dry_run": true,
+  "rows": null,
+  "metadata": {
+    "validation_steps": [...],
+    "total_bytes_processed": 75832225,
+    "estimated_cost_usd": 0.000345,
+    "linking": {...},
+    "summary": "í–‰ ìˆ˜: 0 | ì˜ˆìƒë¹„ìš©: $0.000345"
+  }
+}
+```
+
+### Query Stream (SSE)
+
+```bash
+GET /api/query/stream?q=ì§€ë‚œ 7ì¼ ì£¼ë¬¸ ì¶”ì´&limit=10&dry_run=true
+```
+
+**SSE ì´ë²¤íŠ¸**:
+```
+event: normalize
+data: {"text_len": 11, "meta": {"normalized": true}}
+
+event: context
+data: {"keys": []}
+
+event: nlu
+data: {"intent": "metric_over_time", "slots": {...}}
+
+event: plan
+data: {"intent": "metric_over_time", "metric": "orders", "grain": "day"}
+
+event: sql
+data: {"sql": "SELECT...", "source": "semantic_llm", "provider": "openai"}
+
+event: linking
+data: {"confidence": 0.9, "candidates": [...]}
+
+event: validated
+data: {"ok": true}
+
+event: check
+data: {"name": "lint", "ok": true, ...}
+
+event: check
+data: {"name": "dry_run", "ok": true, "meta": {"total_bytes_processed": 75832225}}
+
+event: result
+data: {"sql": "...", "dry_run": true, "rows": null, "metadata": {...}}
+```
+
+---
+
+## ğŸ§  12ë‹¨ê³„ NL2SQL íŒŒì´í”„ë¼ì¸
+
+```
+ìì—°ì–´ ì§ˆë¬¸
+    â†“
+[1] Normalize - í…ìŠ¤íŠ¸ ì •ê·œí™” ë° ë™ì˜ì–´ ì¹˜í™˜
+    â†“
+[2] Context - ëŒ€í™” ì»¨í…ìŠ¤íŠ¸ ë¡œë“œ
+    â†“
+[3] NLU - ì˜ë„ ë° ìŠ¬ë¡¯ ì¶”ì¶œ (í•˜ì´ë¸Œë¦¬ë“œ: í‚¤ì›Œë“œ + LLM)
+    â†“
+[4] Planner - ì‹¤í–‰ ê³„íš ìƒì„± (ì‹œë§¨í‹± ëª¨ë¸ ê¸°ë°˜ ê²€ì¦)
+    â†“
+[5] SQL Generation - LLM ê¸°ë°˜ ë™ì  SQL ìƒì„±
+    â”‚   â”œâ”€ GA4 í…Œì´ë¸” ì„œí”½ìŠ¤ ìë™ ì²˜ë¦¬
+    â”‚   â”œâ”€ ì‹œë§¨í‹± ëª¨ë¸ ë©”íŠ¸ë¦­ ì •ì˜ í™œìš©
+    â”‚   â””â”€ ëŒ€í™” ì»¨í…ìŠ¤íŠ¸ ë°˜ì˜
+    â†“
+[6] Schema Linking - ìŠ¤í‚¤ë§ˆ ìš”ì†Œ ë§¤ì¹­ (í•˜ì´ë¸Œë¦¬ë“œ: í† í° + LLM)
+    â†“
+[7] Guard - SQL íŒŒì‹± (SQLGlot) ë° ê°€ë“œë ˆì¼
+    â†“
+[8] Validation - 6ë‹¨ê³„ ê²€ì¦ íŒŒì´í”„ë¼ì¸
+    â†“
+[9] Repair - LLM ê¸°ë°˜ ì˜¤ë¥˜ ìë™ ìˆ˜ì • (ì„ íƒì )
+    â†“
+[10] Execute - BigQuery ì‹¤í–‰ (Dry Run / Full / Materialize)
+    â†“
+[11] Summarize - ê²°ê³¼ ìš”ì•½ (ê·œì¹™ ê¸°ë°˜ + LLM)
+    â†“
+[12] Response - í´ë¼ì´ì–¸íŠ¸ì— ì‘ë‹µ ë°˜í™˜
+```
+
+---
+
+## ğŸ¯ ì‹œë§¨í‹± ëª¨ë¸
+
+### semantic.yml - ì—”í‹°í‹° ë° ì°¨ì› ì •ì˜
+
+```yaml
+entities:
+  - name: event
+    grain: event_id
+    table: `project.dataset.events_*`
+    dimensions:
+      - name: event_date
+      - name: event_name
+      - name: user_pseudo_id
+    measures:
+      - name: events
+        expr: COUNT(*)
+
+  - name: session
+    grain: session_id
+    dimensions:
+      - name: device_category  # â†’ device.category (GA4)
+      - name: source_medium    # â†’ traffic_source.medium
+    measures:
+      - name: sessions
+        expr: COUNT(DISTINCT session_id)
+
+# NLU í‚¤ì›Œë“œ (í•˜ì´ë¸Œë¦¬ë“œ ë§¤ì¹­)
+nlu_keywords:
+  intents:
+    metric_over_time: ['ì¶”ì´', 'trend', 'ë³€í™”']
+  metrics:
+    orders: ['ì£¼ë¬¸', 'orders', 'êµ¬ë§¤']
+    users: ['ì‚¬ìš©ì', 'ë°©ë¬¸ì', 'users']
+
+# Planner ì„¤ì •
+planner_config:
+  valid_intents: [metric, metric_over_time, comparison, aggregation]
+  defaults:
+    metric: orders
+    grain: day
+
+# GA4 ìŠ¤í‚¤ë§ˆ (ë„¤ìŠ¤í‹°ë“œ í•„ë“œ)
+ga4_schema:
+  nested_fields:
+    device:
+      - category: "device.category"
+      - operating_system: "device.operating_system"
+    geo:
+      - country: "geo.country"
+      - city: "geo.city"
+
+common_dimensions:
+  ë””ë°”ì´ìŠ¤ë³„: "device.category"
+  êµ­ê°€ë³„: "geo.country"
+```
+
+### metrics_definitions.yaml - ë©”íŠ¸ë¦­ ê³µì‹
+
+```yaml
+metrics:
+  - name: gmv
+    description: ì´ ê±°ë˜ì•¡
+    expr: SUM(ecommerce.purchase_revenue)
+    default_filters:
+      - event_name = 'purchase'
+
+  - name: orders
+    description: ì£¼ë¬¸ ê±´ìˆ˜
+    expr: COUNT(DISTINCT ecommerce.transaction_id)
+    default_filters:
+      - event_name = 'purchase'
+```
+
+### golden_queries.yaml - Few-shot ì˜ˆì œ
+
+```yaml
+queries:
+  - nl: "ì§€ë‚œ 7ì¼ ì£¼ë¬¸ ì¶”ì´"
+    intent: metric_over_time
+    slots:
+      metric: orders
+      time_window: {days: 7}
+      grain: day
+
+  - nl: "ë””ë°”ì´ìŠ¤ë³„ ë°©ë¬¸ì ìˆ˜"
+    intent: aggregation
+    slots:
+      metric: users
+      group_by: [device_category]
+```
+
+---
+
+## ğŸ”§ ì„¤ì •
+
+### LLM í”„ë¡œë°”ì´ë” ì„¤ì •
+
+```bash
+# .env íŒŒì¼
+
+# OpenAI (ê¶Œì¥)
+llm_provider=openai
+openai_api_key=sk-...
+openai_model=gpt-4o-mini
+
+# ë˜ëŠ” Claude
+llm_provider=claude
+anthropic_api_key=sk-ant-...
+anthropic_model=claude-3-5-sonnet-20240620
+
+# ë˜ëŠ” Gemini
+llm_provider=gemini
+gemini_api_key=AIza...
+gemini_model=gemini-1.5-flash
+
+# LLM íŒŒë¼ë¯¸í„°
+llm_temperature=0.1
+llm_max_tokens=2048
+llm_enable_repair=true
+llm_enable_result_summary=false
+```
+
+### BigQuery ì„¤ì •
+
+```bash
+# GCP í”„ë¡œì íŠ¸
+gcp_project=your-project-id
+bq_default_location=asia-northeast3
+
+# ë¹„ìš© ì œí•œ (ë°”ì´íŠ¸ ë‹¨ìœ„)
+maximum_bytes_billed=10000000000  # 10GB
+
+# Dry Run ì „ìš© ëª¨ë“œ (ì•ˆì „)
+dry_run_only=true
+
+# ê°€ê²© ì„¤ì • (TBë‹¹ USD)
+price_per_tb_usd=5.0
+```
+
+### ë¡œê¹… ì„¤ì •
+
+```bash
+# ë¡œê·¸ íŒŒì¼
+log_file_path=logs/app.log
+
+# ë¡œí…Œì´ì…˜ ë°©ì‹
+log_rotation=daily  # ë˜ëŠ” size
+
+# ë¡œê·¸ ë ˆë²¨
+log_level=INFO
+
+# UTC ì‹œê°„ ì‚¬ìš©
+log_utc=false
+```
+
+---
+
+## ğŸ’» ì‚¬ìš© ì˜ˆì‹œ
+
+### cURL
+
+```bash
+# ê°„ë‹¨í•œ ì§ˆë¬¸ (í‚¤ì›Œë“œ ë§¤ì¹­)
+curl -X POST http://localhost:8080/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"q": "ì§€ë‚œ 7ì¼ ì£¼ë¬¸ ì¶”ì´", "dry_run": true}'
+
+# ë³µì¡í•œ ì§ˆë¬¸ (LLM ì‚¬ìš©)
+curl -X POST http://localhost:8080/api/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "q": "ì‘ë…„ ë™ê¸° ëŒ€ë¹„ ì˜¬í•´ ëª¨ë°”ì¼ ê³ ê°ì˜ í‰ê·  êµ¬ë§¤ì•¡ ì¦ê°€ìœ¨",
+    "use_llm": true,
+    "llm_provider": "openai",
+    "dry_run": false
+  }'
+
+# SSE ìŠ¤íŠ¸ë¦¬ë°
+curl "http://localhost:8080/api/query/stream?q=ì§€ë‚œ+7ì¼+ì£¼ë¬¸+ì¶”ì´&dry_run=true"
+```
+
+### Python
+
+```python
+import httpx
+
+# ë™ê¸°ì‹ ì¿¼ë¦¬
+response = httpx.post("http://localhost:8080/api/query", json={
+    "q": "ë””ë°”ì´ìŠ¤ë³„ ì‹œê°„ëŒ€ë³„ ë°©ë¬¸ì ìˆ˜",
+    "limit": 100,
+    "dry_run": True
+})
+
+result = response.json()
+print(result["sql"])
+print(result["metadata"]["estimated_cost_usd"])
+
+# SSE ìŠ¤íŠ¸ë¦¬ë°
+async with httpx.AsyncClient() as client:
+    async with client.stream(
+        "GET",
+        "http://localhost:8080/api/query/stream",
+        params={"q": "ì§€ë‚œ 7ì¼ ì£¼ë¬¸ ì¶”ì´", "dry_run": "true"}
+    ) as response:
+        async for line in response.aiter_lines():
+            print(line)
+```
+
+---
+
+## ğŸ“Š ì•„í‚¤í…ì²˜ ë‹¤ì´ì–´ê·¸ë¨
+
+### ì‹œìŠ¤í…œ ì•„í‚¤í…ì²˜
+
+```
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚  Vue3 Frontend  â”‚
+â”‚   (ChatGPT UI)  â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+         â”‚ REST/SSE
+         â†“
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚         FastAPI Backend                  â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”‚
+â”‚  â”‚  12ë‹¨ê³„ NL2SQL íŒŒì´í”„ë¼ì¸            â”‚ â”‚
+â”‚  â”‚  1. Normalize â†’ 2. Context â†’       â”‚ â”‚
+â”‚  â”‚  3. NLU â†’ 4. Planner â†’             â”‚ â”‚
+â”‚  â”‚  5. SQL Gen â†’ 6. Linking â†’         â”‚ â”‚
+â”‚  â”‚  7. Guard â†’ 8. Validation â†’        â”‚ â”‚
+â”‚  â”‚  9. Repair â†’ 10. Execute â†’         â”‚ â”‚
+â”‚  â”‚  11. Summarize â†’ 12. Response      â”‚ â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â”‚
+â”‚                                          â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”‚
+â”‚  â”‚  ì‹œë§¨í‹± ëª¨ë¸ (YAML)                  â”‚ â”‚
+â”‚  â”‚  - ì—”í‹°í‹°/ì°¨ì›/ì¸¡ì •í•­ëª©              â”‚ â”‚
+â”‚  â”‚  - ë©”íŠ¸ë¦­ ê³µì‹ ë° í•„í„°               â”‚ â”‚
+â”‚  â”‚  - Few-shot ì˜ˆì œ                    â”‚ â”‚
+â”‚  â”‚  - GA4 ìŠ¤í‚¤ë§ˆ                        â”‚ â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â”‚
+â””â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+       â”‚                      â”‚
+       â†“                      â†“
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”      â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚  LLM APIs    â”‚      â”‚  BigQuery    â”‚
+â”‚  - OpenAI    â”‚      â”‚  - Events    â”‚
+â”‚  - Claude    â”‚      â”‚  - Orders    â”‚
+â”‚  - Gemini    â”‚      â”‚  - Sessions  â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜      â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+```
+
+---
+
+## ğŸ¨ ì£¼ìš” ëª¨ë“ˆ ì„¤ëª…
+
+### ë°±ì—”ë“œ ì„œë¹„ìŠ¤
+
+| ëª¨ë“ˆ | ì—­í•  | í•˜ì´ë¸Œë¦¬ë“œ | íŒŒì¼ |
+|------|------|----------|------|
+| **normalize** | í…ìŠ¤íŠ¸ ì •ê·œí™”, ë™ì˜ì–´ ì¹˜í™˜ | - | normalize.py |
+| **context** | ëŒ€í™” ì»¨í…ìŠ¤íŠ¸ ê´€ë¦¬ | - | context.py |
+| **nlu** | ì˜ë„/ìŠ¬ë¡¯ ì¶”ì¶œ | âœ… í‚¤ì›Œë“œ + LLM | nlu.py |
+| **planner** | ì¿¼ë¦¬ ê³„íš, ê²€ì¦ | - | planner.py |
+| **sqlgen** | SQL ìƒì„± (ì‹ ê·œ) | LLM ê¸°ë°˜ | sqlgen.py |
+| **linking** | ìŠ¤í‚¤ë§ˆ ë§¤ì¹­ | âœ… í† í° + LLM | linking.py |
+| **guard** | SQL íŒŒì‹±, ê°€ë“œë ˆì¼ | - | guard.py |
+| **validator** | ë³´ì•ˆ/í’ˆì§ˆ ê²€ì‚¬ | - | validator.py |
+| **validation** | 6ë‹¨ê³„ íŒŒì´í”„ë¼ì¸ | - | validation.py |
+| **executor** | BigQuery ì‹¤í–‰ | - | executor.py |
+
+### ì‹œë§¨í‹± ë ˆì´ì–´
+
+| íŒŒì¼ | ì—­í•  |
+|------|------|
+| semantic.yml | ì—”í‹°í‹°, ì°¨ì›, ì¸¡ì •í•­ëª©, NLU í‚¤ì›Œë“œ, GA4 ìŠ¤í‚¤ë§ˆ |
+| metrics_definitions.yaml | ë©”íŠ¸ë¦­ ê³µì‹ ë° ê¸°ë³¸ í•„í„° |
+| golden_queries.yaml | Few-shot í•™ìŠµ ì˜ˆì œ |
+| datasets.yaml | í…Œì´ë¸”ëª… ì˜¤ë²„ë¼ì´ë“œ |
+| ga4_schema.yaml | GA4 ë„¤ìŠ¤í‹°ë“œ í•„ë“œ ìƒì„¸ ì •ì˜ |
+| aliases.yaml | í•œì˜ ì»¬ëŸ¼ ë³„ì¹­ ë§¤í•‘ |
+
+---
+
+## ğŸ” GA4 BigQuery Export ì§€ì›
+
+### ë„¤ìŠ¤í‹°ë“œ í•„ë“œ ìë™ ì²˜ë¦¬
+
+**ì§ˆë¬¸**: "ë””ë°”ì´ìŠ¤ë³„ êµ­ê°€ë³„ ë°©ë¬¸ì ìˆ˜"
+
+**ìƒì„± SQL**:
+```sql
+SELECT
+  device.category AS device_category,  -- ë„¤ìŠ¤í‹°ë“œ í•„ë“œ!
+  geo.country AS country,               -- ë„¤ìŠ¤í‹°ë“œ í•„ë“œ!
+  COUNT(DISTINCT user_pseudo_id) AS users
+FROM `project.dataset.events_*` AS e
+WHERE _TABLE_SUFFIX BETWEEN '20251031' AND '20251107'
+GROUP BY device.category, geo.country
+ORDER BY users DESC
+LIMIT 100
+```
+
+### í…Œì´ë¸” ì„œí”½ìŠ¤ ìë™ ê³„ì‚°
+
+| ì§ˆë¬¸ | _TABLE_SUFFIX ì¡°ê±´ |
+|------|-------------------|
+| "ì–´ì œ" | `= '20251106'` |
+| "ì§€ë‚œ 7ì¼" | `BETWEEN '20251031' AND '20251107'` |
+| "ìµœê·¼ 30ì¼" | `BETWEEN '20251008' AND '20251107'` |
+
+---
+
+## ğŸ§ª í…ŒìŠ¤íŠ¸
+
+```bash
+# ì „ì²´ í…ŒìŠ¤íŠ¸
+pytest
+
+# íŠ¹ì • í…ŒìŠ¤íŠ¸
+pytest tests/test_query_stub.py -v
+
+# ì»¤ë²„ë¦¬ì§€
+pytest --cov=app --cov-report=html
+```
+
+---
+
+## ğŸ“– ë¬¸ì„œ
+
+- [backend_analysis_report.md](backend_analysis_report.md) - ë°±ì—”ë“œ ì•„í‚¤í…ì²˜ ìƒì„¸ ë¶„ì„
+- [docs/validation_architecture.md](docs/validation_architecture.md) - ê²€ì¦ íŒŒì´í”„ë¼ì¸ ì„¤ëª…
+- [app/semantic/ga4_schema.yaml](app/semantic/ga4_schema.yaml) - GA4 ìŠ¤í‚¤ë§ˆ ë ˆí¼ëŸ°ìŠ¤
+
+---
+
+## ğŸ› ï¸ ê°œë°œ ê°€ì´ë“œ
+
+### ìƒˆë¡œìš´ ë©”íŠ¸ë¦­ ì¶”ê°€
+
+```yaml
+# semantic.yml
+metrics:
+  - name: revenue
+    expr: SUM(ecommerce.purchase_revenue_in_usd)
+    default_filters:
+      - event_name = 'purchase'
+```
+
+â†’ ì½”ë“œ ë³€ê²½ ì—†ì´ ì¦‰ì‹œ ì‚¬ìš© ê°€ëŠ¥!
+
+### ìƒˆë¡œìš´ NLU í‚¤ì›Œë“œ ì¶”ê°€
+
+```yaml
+# semantic.yml
+nlu_keywords:
+  metrics:
+    revenue:
+      - 'ìˆ˜ìµ'
+      - 'profit'
+      - 'ì´ìµ'
+```
+
+â†’ ì„œë²„ ì¬ì‹œì‘ë§Œìœ¼ë¡œ ì ìš©!
+
+### ì»¤ìŠ¤í…€ LLM í”„ë¡¬í”„íŠ¸
+
+```python
+# .env
+llm_system_prompt=You are a BigQuery SQL expert specializing in GA4 analytics.
+```
+
+---
+
+## ğŸš¨ ë¬¸ì œ í•´ê²°
+
+### OpenAI API ì˜¤ë¥˜
+
+**ì˜¤ë¥˜**: `Unsupported parameter: 'max_tokens'`
+
+**í•´ê²°**: gpt-4o ëª¨ë¸ì€ `max_completion_tokens` ì‚¬ìš© (ìë™ ì²˜ë¦¬ë¨)
+
+### BigQuery ì—°ê²° ì˜¤ë¥˜
+
+**ì˜¤ë¥˜**: `BigQuery client not installed`
+
+**í•´ê²°**:
+```bash
+pip install google-cloud-bigquery
+```
+
+### ê°€ë“œë ˆì¼ ìœ„ë°˜
+
+**ì˜¤ë¥˜**: `GuardrailViolation: query violates guardrail policy`
+
+**ì›ì¸**: DELETE, UPDATE, INSERT, DROP, SELECT * ì‚¬ìš©
+
+**í•´ê²°**: `guardrails.json` ì •ì±… í™•ì¸ ë° SQL ìˆ˜ì •
+
+---
+
+## ğŸ“ˆ ì„±ëŠ¥ ìµœì í™”
+
+### ìºì‹± ì „ëµ
+- **ì‹œë§¨í‹± ëª¨ë¸**: ë©”ëª¨ë¦¬ ìºì‹œ (ì¬ë¡œë“œ ë¶ˆí•„ìš”)
+- **ì¹´íƒˆë¡œê·¸**: TTL 30ë¶„
+- **BigQuery ê²°ê³¼**: êµ¬ì²´í™”(materialize) ì˜µì…˜
+
+### ë¹„ìš© ì ˆê°
+- **Dry Run ìš°ì„ **: ë¬´ë£Œ êµ¬ë¬¸ ê²€ì¦
+- **Early Exit**: ê²€ì¦ ì‹¤íŒ¨ ì‹œ ì¦‰ì‹œ ì¤‘ë‹¨
+- **LIMIT ì‚¬ìš©**: Schema(0), Canary(100)
+
+### í•˜ì´ë¸Œë¦¬ë“œ ì „ëµ
+- **ê°„ë‹¨í•œ ì§ˆë¬¸**: í‚¤ì›Œë“œ ë§¤ì¹­ (ë¬´ë£Œ, ë¹ ë¦„)
+- **ë³µì¡í•œ ì§ˆë¬¸**: LLM í˜¸ì¶œ (ìœ ë£Œ, ì •í™•)
+
+---
+
+## ğŸ¤ ê¸°ì—¬ ê°€ì´ë“œ
+
+### ë¸Œëœì¹˜ ì „ëµ
+- `main`: í”„ë¡œë•ì…˜
+- `develop`: ê°œë°œ
+- `feature/*`: ê¸°ëŠ¥ ê°œë°œ
+
+### ì»¤ë°‹ ë©”ì‹œì§€
+```
+feat: ìƒˆë¡œìš´ ë©”íŠ¸ë¦­ ì¶”ê°€
+fix: GA4 ë„¤ìŠ¤í‹°ë“œ í•„ë“œ ì˜¤ë¥˜ ìˆ˜ì •
+docs: README ì—…ë°ì´íŠ¸
+refactor: SQL ìƒì„± ë¡œì§ ê°œì„ 
+```
+
+---
+
+## ğŸ“ ë¼ì´ì„ ìŠ¤
+
+MIT License
+
+---
+
+## ğŸ‘¥ ì‘ì„±ì
+
+AI-powered NL2SQL Platform
+
+---
+
+## ğŸ”— ì°¸ê³  ìë£Œ
+
+- [FastAPI ê³µì‹ ë¬¸ì„œ](https://fastapi.tiangolo.com/)
+- [BigQuery í‘œì¤€ SQL](https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax)
+- [GA4 BigQuery Export ìŠ¤í‚¤ë§ˆ](https://support.google.com/analytics/answer/7029846)
+- [SQLGlot ë¬¸ì„œ](https://sqlglot.com/)
+
+---
+
+## ğŸ¯ ë¡œë“œë§µ
+
+### v1.0 (í˜„ì¬)
+- âœ… 12ë‹¨ê³„ NL2SQL íŒŒì´í”„ë¼ì¸
+- âœ… ë‹¤ì¤‘ LLM ì§€ì›
+- âœ… GA4 ë„¤ìŠ¤í‹°ë“œ í•„ë“œ ì²˜ë¦¬
+- âœ… í•˜ì´ë¸Œë¦¬ë“œ ì•„í‚¤í…ì²˜
+
+### v1.1 (ì˜ˆì •)
+- â³ ë‹¤ì¤‘ í…Œì´ë¸” JOIN ìë™ ìƒì„±
+- â³ ì„ë² ë”© ê¸°ë°˜ ìŠ¤í‚¤ë§ˆ ë§í‚¹
+- â³ Redis ê¸°ë°˜ ì»¨í…ìŠ¤íŠ¸ ì €ì¥
+- â³ ì¿¼ë¦¬ ìºì‹±
+
+### v2.0 (ì¥ê¸°)
+- â³ ìë™ ì¿¼ë¦¬ ìµœì í™”
+- â³ ì‹œê°í™” ìë™ ìƒì„±
+- â³ ë‹¤êµ­ì–´ ì§€ì› í™•ëŒ€
+- â³ ì‹¤ì‹œê°„ ë°ì´í„° ìŠ¤íŠ¸ë¦¬ë°
+
+---
+
+## ğŸ“ ìƒì„¸ Sequence Diagram
+
+### ì „ì²´ ìì—°ì–´ ì§ˆì˜ ì²˜ë¦¬ íë¦„ (í•¨ìˆ˜ ë ˆë²¨)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant U as User
-    participant FE as Frontend ChatView
-    participant API as FastAPI (/api/query | /api/query/stream)
-    participant NLU as NLU (extract)
-    participant PL as Planner (make_plan)
-    participant LLM as LLM Provider<br/>(OpenAI/Claude/Gemini)
-    participant SG as SQLGen (Rule-based)
-    participant VAL as Guardrails (ensure_safe + lint)
-    participant PIPE as Validation Pipeline
-    participant BQ as BigQuery<br/>(via Connector)
-    participant EXE as Executor (run/materialize)
-    participant UI as Result Panel
+    participant User
+    participant ChatView as Frontend<br/>ChatView.vue
+    participant API as FastAPI<br/>query.py
 
-    U->>FE: ÀÚ¿¬¾î ÁúÀÇ ÀÔ·Â
-    FE->>API: POST /api/query {q, dry_run, limit, use_llm, llm_provider, materialize}\n or GET /api/query/stream...
-    API->>NLU: extract(q)
-    NLU-->>API: intent, slots
-    API->>PL: make_plan(intent, slots)
-    PL-->>API: plan
-
-    alt use_llm == true
-        API->>LLM: Prompt(semantic + metrics + golden few-shot)
-        LLM-->>API: SQL (```sql ... ```)
-    else
-        API->>SG: generate(plan, limit)
-        SG-->>API: SQL
+    box Services Layer
+    participant NX as normalize.py<br/>normalize()
+    participant CTX as context.py<br/>get_context()
+    participant NLU as nlu.py<br/>extract()
+    participant PL as planner.py<br/>make_plan()
+    participant SG as sqlgen.py<br/>generate()
+    participant LINK as linking.py<br/>schema_link()
+    participant GRD as guard.py<br/>parse_sql()
+    participant VAL as validator.py<br/>ensure_safe()
+    participant PIPE as validation.py<br/>run_pipeline()
+    participant EXE as executor.py<br/>run()
+    participant SUM as summarize.py<br/>summarize()
     end
+
+    participant LLM as LLM API<br/>OpenAI/Claude/Gemini
+    participant BQ as BigQuery<br/>API
+
+    User->>ChatView: ì§ˆë¬¸ ì…ë ¥: "ë””ë°”ì´ìŠ¤ë³„ ì‹œê°„ëŒ€ë³„ ë°©ë¬¸ì ìˆ˜"
+    ChatView->>API: POST /api/query/stream
+
+    Note over API: 1. í…ìŠ¤íŠ¸ ì •ê·œí™”
+    API->>NX: normalize(q)
+    NX->>NX: ê³µë°± ì •ë¦¬, ë™ì˜ì–´ ì¹˜í™˜
+    NX-->>API: (normalized_text, meta)
+    API-->>ChatView: event: normalize
+
+    Note over API: 2. ëŒ€í™” ì»¨í…ìŠ¤íŠ¸ ë¡œë“œ
+    API->>CTX: get_context(conversation_id)
+    CTX-->>API: {last_sql, last_plan}
+    API-->>ChatView: event: context
+
+    Note over API: 3. ìì—°ì–´ ì´í•´ (í•˜ì´ë¸Œë¦¬ë“œ)
+    API->>NLU: extract(normalized_text, use_llm=True)
+    NLU->>NLU: _extract_keyword_based(q)
+    NLU->>NLU: _calculate_confidence(intent, slots)
+
+    alt confidence < 0.7
+        NLU->>LLM: _call_openai(prompt)<br/>"ì˜ë„ì™€ ìŠ¬ë¡¯ ì¶”ì¶œ"
+        LLM-->>NLU: {intent, slots} JSON
+    end
+
+    NLU-->>API: (intent, slots)
+    API-->>ChatView: event: nlu
+
+    Note over API: 4. ì¿¼ë¦¬ ê³„íš ìƒì„±
+    API->>PL: make_plan(intent, slots, validate=False)
+    PL->>PL: _load_semantic_config()
+    PL->>PL: ê¸°ë³¸ê°’ ì ìš© (metric, grain)
+    PL-->>API: plan {intent, metric, grain, slots}
+    API-->>ChatView: event: plan
+
+    Note over API: 5. SQL ìƒì„± (LLM ê¸°ë°˜)
+    API->>SG: generate(plan, question, limit, llm_provider)
+    SG->>SG: _determine_table_suffix()<br/>ë‚ ì§œ ë²”ìœ„ ê³„ì‚°
+    SG->>SG: _analyze_required_tables()<br/>í…Œì´ë¸” ë¶„ì„
+    SG->>SG: _build_sql_generation_prompt()<br/>ì‹œë§¨í‹± ëª¨ë¸ + GA4 ìŠ¤í‚¤ë§ˆ
+    SG->>LLM: _call_openai_for_sql(prompt)<br/>"BigQuery SQL ìƒì„±"
+    LLM-->>SG: SQL ë¬¸ìì—´
+    SG->>SG: _post_process_sql()<br/>ì½”ë“œ ë¸”ë¡ ì œê±°, LIMIT ì¶”ê°€
+    SG-->>API: SQL
+    API-->>ChatView: event: sql
+
+    Note over API: 6. ìŠ¤í‚¤ë§ˆ ë§í‚¹ (í•˜ì´ë¸Œë¦¬ë“œ)
+    API->>LINK: schema_link(question, use_llm=True)
+    LINK->>LINK: _schema_link_token_based()<br/>í† í° + ë³„ì¹­ + ë™ì˜ì–´ ë§¤ì¹­
+
+    alt confidence < 0.6
+        LINK->>LLM: _call_openai_for_linking(prompt)<br/>"ìŠ¤í‚¤ë§ˆ ìš”ì†Œ ë§¤ì¹­"
+        LLM-->>LINK: {candidates, confidence} JSON
+    end
+
+    LINK-->>API: {candidates, confidence, method}
+    API-->>ChatView: event: linking
+
+    Note over API: 7. ê°€ë“œë ˆì¼ ê²€ì‚¬
+    API->>GRD: parse_sql(sql)
+    GRD->>GRD: sqlglot.parse_one(sql, "bigquery")
+    GRD-->>API: AST or None
 
     API->>VAL: ensure_safe(sql)
-    VAL-->>API: ok (or violation ¡æ abort)
+    VAL->>VAL: _load_policy()<br/>guardrails.json ë¡œë“œ
+    VAL->>VAL: ìœ„í—˜ í‚¤ì›Œë“œ ê²€ì‚¬<br/>(DELETE, UPDATE, DROP ë“±)
+    VAL-->>API: ok or GuardrailViolation
+    API-->>ChatView: event: validated {ok: true}
 
-    API->>PIPE: run_pipeline(sql, plan)
-    PIPE->>VAL: lint(sql) (SELECT * / time filter µî)
-    VAL-->>PIPE: issues
-    PIPE->>BQ: DRY RUN (bytes, cost)
-    BQ-->>PIPE: total_bytes_processed / errors
-    PIPE->>BQ: EXPLAIN sql
-    BQ-->>PIPE: stages/operators
-    PIPE->>BQ: SELECT * FROM (sql) LIMIT 0
-    BQ-->>PIPE: schema(fields)
-    PIPE->>BQ: SELECT * FROM (sql) LIMIT N (canary)
-    BQ-->>PIPE: sample rows count
-    PIPE-->>API: steps report
+    Note over API: 8. ê²€ì¦ íŒŒì´í”„ë¼ì¸ (6ë‹¨ê³„)
+    API->>PIPE: run_pipeline(sql, plan, logger)
+
+    rect rgb(240, 248, 255)
+    Note over PIPE: 8-1. Lint ê²€ì‚¬
+    PIPE->>VAL: lint(sql)
+    VAL->>VAL: SELECT * ê²€ì‚¬
+    VAL->>VAL: ì‹œê°„ í•„í„° ê²€ì‚¬
+    VAL-->>PIPE: StepResult(lint, ok, issues)
+    PIPE-->>ChatView: event: check {name: "lint"}
+    end
+
+    rect rgb(240, 255, 240)
+    Note over PIPE: 8-2. Dry Run
+    PIPE->>BQ: run_query(sql, dry_run=True)
+    BQ-->>PIPE: total_bytes_processed
+    PIPE-->>ChatView: event: check {name: "dry_run", meta: {bytes}}
+    end
+
+    rect rgb(255, 250, 240)
+    Note over PIPE: 8-3. Explain (ì„ íƒì )
+    PIPE->>BQ: run_query("EXPLAIN " + sql)
+    BQ-->>PIPE: execution plan or error
+    PIPE-->>ChatView: event: check {name: "explain"}
+    end
+
+    rect rgb(255, 240, 245)
+    Note over PIPE: 8-4. Schema ì¶”ì¶œ
+    PIPE->>BQ: run_query("SELECT * FROM (...) LIMIT 0")
+    BQ-->>PIPE: schema [name, type, mode]
+    PIPE-->>ChatView: event: check {name: "schema"}
+    end
+
+    rect rgb(248, 248, 255)
+    Note over PIPE: 8-5. Canary ì‹¤í–‰
+    PIPE->>BQ: run_query("SELECT * FROM (...) LIMIT 100")
+    BQ-->>PIPE: sample rows
+    PIPE-->>ChatView: event: check {name: "canary"}
+    end
+
+    rect rgb(245, 255, 250)
+    Note over PIPE: 8-6. Domain Assertions
+    PIPE->>PIPE: domain_assertions(sql, plan)
+    PIPE->>PIPE: ë©”íŠ¸ë¦­ í•„í„° ê²€ì¦
+    PIPE->>PIPE: GROUP BY ê²€ì¦
+    PIPE->>PIPE: ì‹œê°„ ë²„í‚·íŒ… ê²€ì¦
+    PIPE-->>ChatView: event: check {name: "assertions"}
+    end
+
+    PIPE-->>API: ValidationReport {steps, sql, schema}
+
+    Note over API: 9. ìµœì¢… ì‹¤í–‰
 
     alt dry_run == true
-        API->>EXE: run(sql, dry_run=true)
-        EXE-->>API: meta(dry_run,cost)
+        API->>EXE: run(sql, dry_run=True)
+        EXE->>BQ: dry_run query
+        BQ-->>EXE: {bytes, cost, job_id}
+        EXE-->>API: QueryResult {rows: null, meta}
     else materialize == true
         API->>EXE: materialize(sql)
-        EXE->>BQ: CTAS/TRUNCATE to dataset.table
-        BQ-->>EXE: ok
-        EXE-->>API: meta(destination table)
+        EXE->>BQ: CREATE TABLE ... AS SELECT ...
+        BQ-->>EXE: destination_table
+        EXE-->>API: QueryResult {rows: null, meta}
     else full execute
-        API->>EXE: run(sql, dry_run=false)
+        API->>EXE: run(sql, dry_run=False)
         EXE->>BQ: execute query
-        BQ-->>EXE: rows
-        EXE-->>API: rows + meta
+        BQ-->>EXE: rows []
+        EXE-->>API: QueryResult {rows, meta}
     end
 
-    opt SSE streaming
-        API-->>FE: event: nlu / plan / sql / validated / check(step-by-step) / result
+    Note over API: 10. ê²°ê³¼ ìš”ì•½
+    API->>SUM: summarize(rows, meta)
+    SUM-->>API: summary_text
+
+    opt llm_enable_result_summary == true
+        API->>SUM: summarize_llm(question, sql, meta)
+        SUM->>LLM: "ìì—°ì–´ ìš”ì•½ ìƒì„±"
+        LLM-->>SUM: nl_summary
+        SUM-->>API: nl_summary
     end
-    API-->>FE: JSON { sql, dry_run, rows?, metadata(validation_steps, cost, etc.) }
 
-    FE->>UI: SQL/¸ŞÅ¸/Å×ÀÌºí ¾÷µ¥ÀÌÆ®(ÆäÀÌÁö³×ÀÌ¼Ç/CSV)
-    UI-->>U: °á°ú Ç¥½Ã
+    Note over API: 11. ì»¨í…ìŠ¤íŠ¸ ì—…ë°ì´íŠ¸
+    API->>CTX: update_context(conv_id, {last_sql, last_plan})
+    CTX-->>API: ok
 
-    note over API: LLM ½ÇÆĞ ½Ã °æ°í ·Î±× ±â·Ï, ±ÔÄ¢ ±â¹İÀ¸·Î Æú¹é
+    Note over API: 12. ì‘ë‹µ ë°˜í™˜
+    API-->>ChatView: event: result<br/>{sql, dry_run, rows, metadata}
+    ChatView->>ChatView: ê²°ê³¼ ë Œë”ë§<br/>ResultPanel.vue
+    ChatView-->>User: SQL + í…Œì´ë¸” í‘œì‹œ
+
+    Note over User,BQ: ì „ì²´ ì²˜ë¦¬ ì‹œê°„: 3-8ì´ˆ<br/>ë¹„ìš©: $0.0001 ~ $1.00 (ì¿¼ë¦¬ í¬ê¸°ì— ë”°ë¼)
 ```
-## Architecture Overview
 
-```mermaid
-flowchart LR
-  subgraph Client
-    FE[Vue3 Frontend\nChatView + Components]
-  end
-
-  subgraph API[FastAPI Backend]
-    R[Routers\n/healthz,/readyz,/api/query,/api/query/stream]
-    S[Services]
-    S_NLU[NLU]
-    S_PL[Planner]
-    S_PMT[Prompt]
-    S_LLM[LLM Client]
-    S_SG[SQLGen]
-    S_VAL[Guardrails]
-    S_PIPE[Validation Pipeline]
-    S_EXE[Executor]
-    BQCON[BQ Connector]
-  end
-
-  subgraph SEM[Semantic Layer]
-    SEM_YML[semantic.yml]
-    SEM_MET[metrics_definitions.yaml]
-    SEM_GQ[golden_queries.yaml]
-    SEM_DS[datasets.yaml]
-  end
-
-  subgraph GCP[BigQuery]
-    BQ[(Project\nDatasets\nTables)]
-  end
-
-  subgraph LLM[Providers]
-    OAI[OpenAI]
-    CLAUDE[Claude]
-    GEM[Gemini]
-  end
-
-  FE -->|REST/SSE| R
-  R --> S_NLU
-  S_NLU --> S_PL
-  S_PL --> S_PMT
-  S_PMT --> S_LLM
-  S_PL --> S_SG
-  S_LLM -->|SQL or error| R
-  S_SG -->|SQL| R
-  R --> S_VAL
-  R --> S_PIPE
-  S_PIPE --> BQCON --> BQ
-  R --> S_EXE --> BQ
-
-  S_PMT -.reads .-> SEM_YML
-  S_PMT -.reads .-> SEM_MET
-  S_PMT -.reads .-> SEM_GQ
-  S_PMT -.overrides .-> SEM_DS
-
-  R -.LLM keys/tuning .-> S_LLM
-  S_LLM --> OAI
-  S_LLM --> CLAUDE
-  S_LLM --> GEM
-
-  R -->|Response JSON| FE
-```
-## Sequence Diagram (Updated)
+### í•¨ìˆ˜ í˜¸ì¶œ ì²´ì¸ (ìƒì„¸)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant U as User
-    participant FE as Frontend ChatView
-    participant API as FastAPI (/api/query | /api/query/stream)
-    participant NX as Normalize (preprocess)
-    participant CTX as Context (conversation)
-    participant NLU as NLU (extract)
-    participant PL as Planner (make_plan)
-    participant CAT as Schema Catalog
-    participant LINK as Schema Linking
-    participant PMT as Prompt (semantic + few-shot)
-    participant LLM as LLM (OpenAI/Claude/Gemini)
-    participant SG as SQLGen (Rule/Template)
-    participant GRD as Guard (ensure_safe + lint + parse)
-    participant PIPE as Validation Pipeline
-    participant EXE as Executor (run/materialize)
-    participant BQ as BigQuery (Connector)
-    participant RPR as Repair (LLM)
-    participant SUM as Summarize (LLM optional)
-    participant UI as Result Panel
+    participant Q as query.py::query_stream()
 
-    U->>FE: ÀÚ¿¬¾î ÁúÀÇ ÀÔ·Â
-    FE->>API: POST /api/query {q, conv_id, use_llm, provider, dry_run, limit} / GET /api/query/stream
-    API->>NX: normalize(q)
-    NX-->>API: q_norm, meta
-    API->>CTX: load(conversation_id)
-    CTX-->>API: last_sql/plan (optional)
-    API->>NLU: extract(q_norm)
-    NLU-->>API: intent, slots
-    API->>PL: make_plan(intent, slots)
-    PL-->>API: plan
-    API->>CAT: load catalog
-    CAT-->>API: tables/columns
-    API->>LINK: schema linking
-    LINK-->>API: candidates, confidence
-
-    alt use_llm == true
-        API->>PMT: build semantic+few-shot prompt
-        PMT->>LLM: chat.completions
-        LLM-->>API: SQL (```sql ... ```)
-    else
-        API->>SG: generate(plan, limit)
-        SG-->>API: SQL
+    box normalize.py
+    participant N1 as normalize()
     end
 
-    API->>GRD: ensure_safe + lint + parse(sqlglot)
-    GRD-->>API: ok or issues
-
-    API->>PIPE: run_pipeline(sql, plan)
-    PIPE-->>API: steps report (DRY RUN, EXPLAIN, SCHEMA, CANARY, ASSERTIONS)
-
-    alt pipeline failed
-        API->>RPR: attempt_repair(q_norm, sql, error, provider)
-        RPR-->>API: fixed_sql?
-        API->>GRD: re-validate fixed_sql
-        API->>PIPE: re-run pipeline
+    box context.py
+    participant C1 as get_context()
+    participant C2 as update_context()
     end
 
-    alt dry_run == true
-        API->>EXE: run(sql, dry_run=true)
-        EXE-->>API: meta(dry_run,cost)
-    else materialize == true
-        API->>EXE: materialize(sql)
-        EXE->>BQ: CTAS/TRUNCATE to dataset.table
-        BQ-->>EXE: ok
-        EXE-->>API: meta(destination table)
-    else full execute
-        API->>EXE: run(sql, dry_run=false)
-        EXE->>BQ: execute query
-        BQ-->>EXE: rows
-        EXE-->>API: rows + meta
+    box nlu.py
+    participant NLU1 as extract()
+    participant NLU2 as _extract_keyword_based()
+    participant NLU3 as _calculate_confidence()
+    participant NLU4 as _extract_llm_based()
+    participant NLU5 as _call_openai()
     end
 
-    opt SSE streaming
-        API-->>FE: event: normalize / context / nlu / plan / linking / sql / validated / check(step) / repair? / result
+    box planner.py
+    participant P1 as make_plan()
+    participant P2 as _load_semantic_config()
+    participant P3 as _validate_intent()
+    participant P4 as _validate_metric()
     end
-    API-->>FE: JSON { sql, dry_run, rows?, metadata(validation_steps, linking, normalized, cost, summary, nl_summary?) }
 
-    FE->>UI: °á°ú ÆĞ³Î ¾÷µ¥ÀÌÆ®(ÆäÀÌÁö³×ÀÌ¼Ç/CSV)
-    UI-->>U: °á°ú Ç¥½Ã
+    box sqlgen.py
+    participant S1 as generate()
+    participant S2 as _determine_table_suffix()
+    participant S3 as _analyze_required_tables()
+    participant S4 as _build_sql_generation_prompt()
+    participant S5 as _format_ga4_schema_for_prompt()
+    participant S6 as _call_llm_for_sql()
+    participant S7 as _call_openai_for_sql()
+    participant S8 as _post_process_sql()
+    end
+
+    box linking.py
+    participant L1 as schema_link()
+    participant L2 as _schema_link_token_based()
+    participant L3 as _schema_link_llm_based()
+    end
+
+    box validator.py
+    participant V1 as ensure_safe()
+    participant V2 as lint()
+    participant V3 as _load_policy()
+    end
+
+    box validation.py
+    participant VP1 as run_pipeline()
+    participant VP2 as lint_sql()
+    participant VP3 as dry_run()
+    participant VP4 as schema()
+    participant VP5 as canary()
+    participant VP6 as domain_assertions()
+    end
+
+    box executor.py
+    participant E1 as run()
+    end
+
+    participant BQ as BigQuery API
+
+    Q->>N1: normalize(q)
+    N1-->>Q: (text, meta)
+
+    Q->>C1: get_context(conv_id)
+    C1-->>Q: context dict
+
+    Q->>NLU1: extract(text, use_llm=True)
+    NLU1->>NLU2: _extract_keyword_based(q)
+    NLU2-->>NLU1: (intent, slots)
+    NLU1->>NLU3: _calculate_confidence(q, intent, slots)
+    NLU3-->>NLU1: confidence
+
+    alt confidence < 0.7
+        NLU1->>NLU4: _extract_llm_based(q)
+        NLU4->>NLU5: _call_openai(prompt)
+        NLU5-->>NLU4: JSON response
+        NLU4-->>NLU1: (llm_intent, llm_slots)
+    end
+
+    NLU1-->>Q: (intent, slots)
+
+    Q->>P1: make_plan(intent, slots, validate=False)
+    P1->>P2: _load_semantic_config()
+    P2-->>P1: config dict
+
+    opt validate == True
+        P1->>P3: _validate_intent(intent, config)
+        P1->>P4: _validate_metric(metric, config)
+    end
+
+    P1-->>Q: plan dict
+
+    Q->>S1: generate(plan, question, limit, llm_provider)
+    S1->>S2: _determine_table_suffix(plan, question, context)
+    S2-->>S1: {use_wildcard, start_date, end_date, suffix_condition}
+
+    S1->>S3: _analyze_required_tables(plan, semantic_model)
+    S3-->>S1: [{entity, table, alias, is_primary}]
+
+    S1->>S4: _build_sql_generation_prompt(...)
+    S4->>S5: _format_ga4_schema_for_prompt(semantic_model)
+    S5-->>S4: GA4 schema info
+    S4-->>S1: complete prompt
+
+    S1->>S6: _call_llm_for_sql(prompt, provider)
+    S6->>S7: _call_openai_for_sql(prompt)
+    S7->>BQ: OpenAI API call
+    BQ-->>S7: SQL text
+    S7-->>S6: SQL
+    S6-->>S1: SQL
+
+    S1->>S8: _post_process_sql(sql, limit)
+    S8-->>S1: cleaned SQL
+    S1-->>Q: final SQL
+
+    Q->>LINK: schema_link(question, use_llm=True)
+    LINK->>L2: _schema_link_token_based(question)
+    L2-->>LINK: {candidates, confidence}
+
+    alt confidence < 0.6
+        LINK->>L3: _schema_link_llm_based(question)
+        L3->>BQ: LLM API call
+        BQ-->>L3: {candidates, confidence}
+        L3-->>LINK: LLM result
+    end
+
+    LINK-->>Q: {candidates, confidence, method}
+
+    Q->>V1: ensure_safe(sql)
+    V1->>V3: _load_policy()
+    V3-->>V1: guardrails policy
+    V1->>V1: í‚¤ì›Œë“œ ê²€ì‚¬ (DELETE, DROP ë“±)
+    V1-->>Q: ok or exception
+
+    Q->>VP1: run_pipeline(sql, plan, logger)
+
+    VP1->>VP2: lint_sql(sql)
+    VP2->>V2: lint(sql)
+    V2-->>VP2: issues []
+    VP2-->>VP1: StepResult(lint)
+
+    VP1->>VP3: dry_run(sql)
+    VP3->>BQ: connector.run_query(sql, dry_run=True)
+    BQ-->>VP3: job {total_bytes_processed}
+    VP3-->>VP1: StepResult(dry_run)
+
+    VP1->>VP4: schema(sql)
+    VP4->>BQ: SELECT * FROM (...) LIMIT 0
+    BQ-->>VP4: schema [{name, type, mode}]
+    VP4-->>VP1: StepResult(schema)
+
+    VP1->>VP5: canary(sql)
+    VP5->>BQ: SELECT * FROM (...) LIMIT 100
+    BQ-->>VP5: rows []
+    VP5-->>VP1: StepResult(canary)
+
+    VP1->>VP6: domain_assertions(sql, plan)
+    VP6->>VP6: ë©”íŠ¸ë¦­ í•„í„° ê²€ì¦
+    VP6->>VP6: GROUP BY ê²€ì¦
+    VP6->>VP6: ì‹œê°„ ë²„í‚·íŒ… ê²€ì¦
+    VP6-->>VP1: StepResult(assertions)
+
+    VP1-->>Q: ValidationReport {steps, sql, schema}
+
+    Q->>E1: run(sql, dry_run)
+    E1->>BQ: execute query or dry_run
+    BQ-->>E1: rows + metadata
+    E1-->>Q: QueryResult {rows, meta}
+
+    Q->>SUM: summarize(rows, meta)
+    SUM-->>Q: summary text
+
+    Q->>C2: update_context(conv_id, {last_sql, last_plan})
+    C2-->>Q: ok
+
+    Q-->>ChatView: event: result {sql, rows, metadata}
+    ChatView-->>User: ê²°ê³¼ í…Œì´ë¸” í‘œì‹œ
+
+    Note over User,BQ: ê° ë‹¨ê³„ë³„ ë¡œê·¸: ì‹œê°„ : íŒŒì¼ : í•¨ìˆ˜ : ë ˆë²¨ : ë©”ì‹œì§€
 ```
-## Architecture Overview (Updated)
+
+### í•˜ì´ë¸Œë¦¬ë“œ ì „ëµ ìƒì„¸ íë¦„
 
 ```mermaid
-flowchart LR
-  subgraph Client
-    FE[Vue3 Frontend\nChatView + Components]
-  end
+flowchart TD
+    Start([ìì—°ì–´ ì§ˆë¬¸]) --> Normalize[1. normalize.normalize<br/>ë™ì˜ì–´ ì¹˜í™˜]
 
-  subgraph API[FastAPI Backend]
-    R[Routers\n/healthz,/readyz,/api/query,/api/query/stream]
-    NX[Normalize]
-    CTX[Context Store]
-    S_NLU[NLU]
-    S_PL[Planner]
-    CAT[Schema Catalog]
-    LINK[Schema Linking]
-    S_PMT[Prompt]
-    S_LLM[LLM Client]
-    S_TPL[Templates]
-    S_SG[SQLGen]
-    S_VAL[Guardrails + sqlglot]
-    S_PIPE[Validation Pipeline]
-    S_EXE[Executor]
-    BQCON[BQ Connector]
-  end
+    Normalize --> NLU_Keyword[2. nlu._extract_keyword_based<br/>í‚¤ì›Œë“œ ë§¤ì¹­]
 
-  subgraph SEM[Semantic Layer]
-    SEM_YML[semantic.yml]
-    SEM_MET[metrics_definitions.yaml]
-    SEM_GQ[golden_queries.yaml]
-    SEM_DS[datasets.yaml]
-    ALIAS[aliases.yaml]
-  end
+    NLU_Keyword --> NLU_Conf{3. nlu._calculate_confidence<br/>ì‹ ë¢°ë„ >= 0.7?}
 
-  subgraph GCP[BigQuery]
-    BQ[(Project\nDatasets\nTables)]
-  end
+    NLU_Conf -->|Yes| Plan[4. planner.make_plan<br/>ë¹ ë¥¸ ì²˜ë¦¬]
+    NLU_Conf -->|No| NLU_LLM[3b. nlu._extract_llm_based<br/>LLM í˜¸ì¶œ]
 
-  subgraph LLM[Providers]
-    OAI[OpenAI]
-    CLAUDE[Claude]
-    GEM[Gemini]
-  end
+    NLU_LLM --> Plan
 
-  FE -->|REST/SSE| R
-  R --> NX --> CTX --> S_NLU --> S_PL
-  S_PL --> CAT --> LINK
-  S_PL --> S_TPL
-  S_PL --> S_PMT --> S_LLM
-  S_LLM --> OAI
-  S_LLM --> CLAUDE
-  S_LLM --> GEM
-  S_TPL --> S_SG
-  S_LLM --> R
-  S_SG --> R
-  R --> S_VAL --> S_PIPE
-  S_PIPE --> BQCON --> BQ
-  R --> S_EXE --> BQ
+    Plan --> SQLGen[5. sqlgen.generate<br/>LLM SQL ìƒì„±]
 
-  S_PMT -.reads .-> SEM_YML
-  S_PMT -.reads .-> SEM_MET
-  S_PMT -.reads .-> SEM_GQ
-  S_PMT -.overrides .-> SEM_DS
-  CAT -.reads .-> SEM_YML
-  LINK -.aliases .-> ALIAS
+    SQLGen --> TableSuffix[5a. _determine_table_suffix<br/>ë‚ ì§œ ë²”ìœ„ ê³„ì‚°]
+    TableSuffix --> Prompt[5b. _build_sql_generation_prompt<br/>ì‹œë§¨í‹± ëª¨ë¸ + GA4 ìŠ¤í‚¤ë§ˆ]
+    Prompt --> LLM_SQL[5c. _call_openai_for_sql<br/>LLM í˜¸ì¶œ]
+    LLM_SQL --> PostProcess[5d. _post_process_sql<br/>ì •ë¦¬]
 
-  R -->|Response JSON| FE
-```
-## Sequence Diagram (Logging markers)
+    PostProcess --> Link_Token[6. linking._schema_link_token_based<br/>í† í° + ë³„ì¹­ ë§¤ì¹­]
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as User
-    participant FE as Frontend ChatView
-    participant API as FastAPI API
-    participant LOG as Logger (file)
-    participant NX as Normalize
-    participant CTX as Context
-    participant NLU as NLU
-    participant PL as Planner
-    participant LINK as Schema Linking
-    participant GEN as SQL Gen (LLM/Rule)
-    participant GRD as Guard
-    participant VAL as Validation Pipeline
-    participant EXE as Executor
+    Link_Token --> Link_Conf{ì‹ ë¢°ë„ >= 0.6?}
 
-    U->>FE: ÁúÀÇ ÀÔ·Â
-    FE->>API: POST /api/query
-    API->>LOG: stage=start
-    API->>NX: normalize
-    NX-->>API: q_norm/meta
-    API->>LOG: stage=normalize
-    API->>CTX: load
-    CTX-->>API: ctx
-    API->>LOG: stage=context
-    API->>NLU: extract
-    NLU-->>API: intent/slots
-    API->>LOG: stage=nlu
-    API->>PL: make_plan
-    PL-->>API: plan
-    API->>LOG: stage=plan
-    API->>LINK: schema_link
-    LINK-->>API: candidates/conf
-    API->>LOG: stage=linking
-    API->>GEN: llm or rule
-    GEN-->>API: sql
-    API->>LOG: stage=llm_sql
-    API->>GRD: ensure_safe + parse
-    GRD-->>API: ok
-    API->>LOG: stage=guard
-    API->>VAL: run_pipeline
-    VAL-->>API: steps report
-    API->>LOG: stage=lint/dry_run/explain/schema/canary/assertions
-    API->>EXE: run/materialize
-    EXE-->>API: rows/meta
-    API->>LOG: stage=end
-    API-->>FE: json response
+    Link_Conf -->|Yes| Guard[7. guard.parse_sql<br/>SQLGlot íŒŒì‹±]
+    Link_Conf -->|No| Link_LLM[6b. linking._schema_link_llm_based<br/>LLM í˜¸ì¶œ]
+
+    Link_LLM --> Guard
+
+    Guard --> Safe[8. validator.ensure_safe<br/>ê°€ë“œë ˆì¼]
+    Safe --> Lint[9. validator.lint<br/>í’ˆì§ˆ ê²€ì‚¬]
+
+    Lint --> Pipeline[10. validation.run_pipeline<br/>6ë‹¨ê³„ ê²€ì¦]
+
+    Pipeline --> Pipe1[10a. lint_sql]
+    Pipe1 --> Pipe2[10b. dry_run]
+    Pipe2 --> Pipe3[10c. explain]
+    Pipe3 --> Pipe4[10d. schema]
+    Pipe4 --> Pipe5[10e. canary]
+    Pipe5 --> Pipe6[10f. domain_assertions]
+
+    Pipe6 --> Execute[11. executor.run<br/>BigQuery ì‹¤í–‰]
+
+    Execute --> Summarize[12. summarize.summarize<br/>ê²°ê³¼ ìš”ì•½]
+
+    Summarize --> Response([ì‘ë‹µ ë°˜í™˜])
+
+    style NLU_Keyword fill:#e1f5ff
+    style NLU_LLM fill:#fff4e1
+    style Link_Token fill:#e1f5ff
+    style Link_LLM fill:#fff4e1
+    style LLM_SQL fill:#ffe1f5
+    style Pipeline fill:#f0f0f0
 ```
 
+### ê° ëª¨ë“ˆì˜ ì£¼ìš” í•¨ìˆ˜
+
+| ëª¨ë“ˆ | ì£¼ìš” í•¨ìˆ˜ | ì…ë ¥ | ì¶œë ¥ |
+|------|----------|------|------|
+| **normalize.py** | `normalize(text)` | str | (normalized_text, meta) |
+| **context.py** | `get_context(conv_id)` | str | dict |
+| | `update_context(conv_id, patch)` | str, dict | None |
+| **nlu.py** | `extract(q, use_llm)` | str, bool | (intent, slots) |
+| | `_extract_keyword_based(q)` | str | (intent, slots) |
+| | `_calculate_confidence(q, intent, slots)` | str, str, dict | float |
+| | `_extract_llm_based(q)` | str | (intent, slots) |
+| **planner.py** | `make_plan(intent, slots, validate)` | str, dict, bool | plan dict |
+| | `_load_semantic_config()` | - | config dict |
+| | `_validate_metric(metric, config)` | str, dict | None or raise |
+| **sqlgen.py** | `generate(plan, question, limit, provider, conv_id)` | dict, str, int, str, str | SQL str |
+| | `_determine_table_suffix(plan, question, context)` | dict, str, dict | suffix_info dict |
+| | `_build_sql_generation_prompt(...)` | multiple | prompt str |
+| | `_call_openai_for_sql(prompt)` | str | SQL str |
+| **linking.py** | `schema_link(question, use_llm)` | str, bool | {candidates, confidence, method} |
+| | `_schema_link_token_based(question)` | str | {candidates, confidence} |
+| | `_schema_link_llm_based(question)` | str | {candidates, confidence} |
+| **guard.py** | `parse_sql(sql)` | str | AST or None |
+| **validator.py** | `ensure_safe(sql)` | str | None or raise |
+| | `lint(sql)` | str | issues [] |
+| **validation.py** | `run_pipeline(sql, perform_execute, plan, logger)` | str, bool, dict, logger | ValidationReport |
+| | `lint_sql(sql)` | str | StepResult |
+| | `dry_run(sql)` | str | StepResult |
+| | `schema(sql)` | str | StepResult |
+| | `canary(sql, limit_rows)` | str, int | StepResult |
+| | `domain_assertions(sql, plan)` | str, dict | StepResult |
+| **executor.py** | `run(sql, dry_run)` | str, bool | QueryResult |
+| | `materialize(sql)` | str | QueryResult |
+| **summarize.py** | `summarize(rows, meta)` | list, dict | str |
+| | `summarize_llm(question, sql, meta, provider)` | str, str, dict, str | str |
+
+---
+
+**Made with â¤ï¸ using FastAPI, Vue3, and LLM**
