@@ -78,7 +78,7 @@ nested_fields:
 top_level_fields:
   event_date: STRING  # YYYYMMDD 형식
   event_timestamp: INT64  # 마이크로초 (TIMESTAMP_MICROS 변환 필요)
-  event_name: STRING  # session_start, page_view, purchase 등
+  event_name: STRING  # 중요! 이벤트 타입을 구분하는 핵심 필드
   event_params: RECORD  # REPEATED, key-value 쌍
   event_previous_timestamp: INT64
   event_value_in_usd: FLOAT64
@@ -98,6 +98,76 @@ top_level_fields:
   # 세션 정보
   ga_session_id: INT64  # (event_params에서 추출)
   ga_session_number: INT64  # (event_params에서 추출)
+
+# GA4 주요 이벤트 타입 (event_name)
+# 중요: GA4는 모든 이벤트를 하나의 테이블에 저장하므로 event_name 필터 필수!
+event_types:
+  # 자동 수집 이벤트
+  automatic_events:
+    - session_start: 세션 시작 (새로운 세션)
+    - first_visit: 첫 방문 (신규 사용자)
+    - user_engagement: 사용자 참여 (10초 이상 체류 또는 2페이지 이상)
+    - page_view: 페이지 조회 (SPA는 수동 설정 필요)
+    - scroll: 스크롤 (90% 스크롤 시)
+    - click: 클릭 (외부 링크)
+    - file_download: 파일 다운로드
+    - video_start: 동영상 시작
+    - video_progress: 동영상 진행
+    - video_complete: 동영상 완료
+
+  # E-commerce 이벤트
+  ecommerce_events:
+    - view_item: 상품 상세 조회
+    - add_to_cart: 장바구니 추가
+    - remove_from_cart: 장바구니 제거
+    - begin_checkout: 결제 시작
+    - add_payment_info: 결제 정보 입력
+    - add_shipping_info: 배송 정보 입력
+    - purchase: 구매 완료 (가장 중요!)
+    - refund: 환불
+
+  # 검색 및 프로모션
+  search_promotion_events:
+    - search: 검색
+    - view_search_results: 검색 결과 조회
+    - view_promotion: 프로모션 조회
+    - select_promotion: 프로모션 선택
+
+# event_name 사용 가이드
+event_name_usage:
+  # 질문 유형별 event_name 매핑
+  mappings:
+    - question_pattern: "페이지 조회|페이지 오픈|페이지뷰|방문|접속"
+      event_name: "page_view"
+      description: "페이지 조회 수를 집계할 때"
+
+    - question_pattern: "구매|주문|결제|판매"
+      event_name: "purchase"
+      description: "구매/주문 관련 집계"
+
+    - question_pattern: "장바구니|카트"
+      event_name: "add_to_cart"
+      description: "장바구니 추가 행동"
+
+    - question_pattern: "세션|방문 세션"
+      event_name: "session_start"
+      description: "세션 시작 이벤트"
+
+    - question_pattern: "사용자 참여|체류|engagement"
+      event_name: "user_engagement"
+      description: "사용자 참여도 측정"
+
+    - question_pattern: "검색"
+      event_name: "search"
+      description: "검색 행동"
+
+  # 주의사항
+  notes:
+    - "GA4는 모든 이벤트를 하나의 테이블(events_*)에 저장"
+    - "event_name으로 이벤트 타입을 구분하므로 필터 필수"
+    - "event_name 없이 집계하면 중복 카운트 발생"
+    - "예: COUNT(*)를 하면 page_view + purchase + ... 모두 합산됨"
+    - "질문 문맥에 맞는 event_name을 WHERE 절에 반드시 추가"
 
 # REPEATED 필드 (배열)
 repeated_fields:

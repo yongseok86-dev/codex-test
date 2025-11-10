@@ -122,7 +122,7 @@ def generate_sql_via_llm(question: str, provider: Optional[str] = None) -> str:
 
         # OpenAI 최신 모델은 max_completion_tokens 사용
         token_param = {}
-        if "gpt-4o" in model or "o1" in model or "o3" in model:
+        if any(x in model for x in ["gpt-4o", "gpt-5", "o1-", "o3-"]):
             token_param["max_completion_tokens"] = max_tokens
         else:
             token_param["max_tokens"] = max_tokens

@@ -376,7 +376,7 @@ def _call_openai(prompt: str) -> str:
         model = settings.openai_model or "gpt-4o-mini"
         token_param = {}
 
-        if "gpt-4o" in model or "o1" in model or "o3" in model:
+        if any(x in model for x in ["gpt-4o", "gpt-5", "o1-", "o3-"]):
             token_param["max_completion_tokens"] = 500
         else:
             token_param["max_tokens"] = 500
@@ -398,7 +398,7 @@ def _call_anthropic(prompt: str) -> str:
         import anthropic
         client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         response = client.messages.create(
-            model=settings.anthropic_model or "claude-3-5-sonnet-20240620",
+            model=settings.anthropic_model or "claude-sonnet-4-5",
             max_tokens=500,
             temperature=0.1,
             messages=[{"role": "user", "content": prompt}]
@@ -413,7 +413,7 @@ def _call_gemini(prompt: str) -> str:
     try:
         import google.generativeai as genai
         genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(settings.gemini_model or "gemini-1.5-flash")
+        model = genai.GenerativeModel(settings.gemini_model or "gemini-2.5-flash")
         response = model.generate_content(
             prompt,
             generation_config=genai.types.GenerationConfig(

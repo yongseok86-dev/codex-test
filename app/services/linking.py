@@ -414,7 +414,7 @@ def _call_openai_for_linking(prompt: str) -> str:
     model = settings.openai_model or "gpt-4o-mini"
     token_param = {}
 
-    if "gpt-4o" in model or "o1" in model or "o3" in model:
+    if any(x in model for x in ["gpt-4o", "gpt-5", "o1-", "o3-"]):
         token_param["max_completion_tokens"] = 1000
     else:
         token_param["max_tokens"] = 1000

@@ -34,10 +34,22 @@ def get_logger(name: str = "app", level: int = logging.INFO) -> logging.Logger:
             except Exception:
                 pass
             try:
-                rotation = (settings.log_rotation or "daily").lower()
+                # 프로세스별 로그 파일 사용 (멀티프로세스 충돌 방지)
+                import os as os_module
+                pid = os_module.getpid()
+
+                # app.log → app.12345.log
+                base_path = settings.log_file_path
+                if '.' in base_path:
+                    name, ext = base_path.rsplit('.', 1)
+                    log_path = f"{name}.{pid}.{ext}"
+                else:
+                    log_path = f"{base_path}.{pid}"
+
+                rotation = (settings.log_rotation or "size").lower()  # daily → size로 기본값 변경
                 if rotation == "daily":
                     file_handler = TimedRotatingFileHandler(
-                        settings.log_file_path,
+                        log_path,
                         when=getattr(settings, "log_when", "midnight"),
                         interval=max(1, int(getattr(settings, "log_interval", 1))),
                         backupCount=getattr(settings, "log_backup_count", 5),
@@ -51,7 +63,7 @@ def get_logger(name: str = "app", level: int = logging.INFO) -> logging.Logger:
                         pass
                 else:
                     file_handler = RotatingFileHandler(
-                        settings.log_file_path,
+                        log_path,
                         maxBytes=getattr(settings, "log_max_bytes", 5_000_000),
                         backupCount=getattr(settings, "log_backup_count", 5),
                         encoding="utf-8",
@@ -97,10 +109,22 @@ def setup_logging(level: int = logging.INFO) -> None:
         except Exception:
             pass
         try:
-            rotation = (settings.log_rotation or "daily").lower()
+            # 프로세스별 로그 파일 사용 (멀티프로세스 충돌 방지)
+            import os as os_module
+            pid = os_module.getpid()
+
+            # app.log → app.12345.log
+            base_path = settings.log_file_path
+            if '.' in base_path:
+                name, ext = base_path.rsplit('.', 1)
+                log_path = f"{name}.{pid}.{ext}"
+            else:
+                log_path = f"{base_path}.{pid}"
+
+            rotation = (settings.log_rotation or "size").lower()  # daily → size로 기본값 변경
             if rotation == "daily":
                 fh = TimedRotatingFileHandler(
-                    settings.log_file_path,
+                    log_path,
                     when=getattr(settings, "log_when", "midnight"),
                     interval=max(1, int(getattr(settings, "log_interval", 1))),
                     backupCount=getattr(settings, "log_backup_count", 5),
@@ -113,7 +137,7 @@ def setup_logging(level: int = logging.INFO) -> None:
                     pass
             else:
                 fh = RotatingFileHandler(
-                    settings.log_file_path,
+                    log_path,
                     maxBytes=getattr(settings, "log_max_bytes", 5_000_000),
                     backupCount=getattr(settings, "log_backup_count", 5),
                     encoding="utf-8",

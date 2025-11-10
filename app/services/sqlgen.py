@@ -162,7 +162,7 @@ def _determine_table_suffix(
     """
     GA4 테이블의 날짜 서픽스를 결정합니다.
 
-    질문의 시간 범위(time_window)와 대화 컨텍스트를 분석하여
+    질문의 시간 범위(time_window)와 대화 컨텍스트, 질문 텍스트를 분석하여
     조회할 GA4 테이블의 날짜 범위를 결정합니다.
 
     Args:
@@ -185,35 +185,83 @@ def _determine_table_suffix(
         ... )
         {
             "use_wildcard": True,
-            "start_date": "20251031",
-            "end_date": "20251106",
-            "suffix_condition": "_TABLE_SUFFIX BETWEEN '20251031' AND '20251106'"
+            "start_date": "20251104",
+            "end_date": "20251110",
+            "suffix_condition": "_TABLE_SUFFIX BETWEEN '20251104' AND '20251110'"
+        }
+
+        >>> _determine_table_suffix(
+        ...     {"slots": {}},
+        ...     "오늘 방문자",
+        ...     {}
+        ... )
+        {
+            "use_wildcard": False,
+            "start_date": "20251110",
+            "end_date": "20251110",
+            "suffix_condition": "_TABLE_SUFFIX = '20251110'"
         }
     """
     slots = plan.get("slots", {})
     time_window = slots.get("time_window", {})
 
-    # 기본값: 오늘 날짜 사용
+    # 오늘 날짜
     today = datetime.now()
-    end_date = today
-    start_date = today
 
-    # 시간 범위가 있으면 날짜 계산
+    # 질문 텍스트에서 날짜 키워드 감지
+    question_lower = question.lower()
+
+    # 1. time_window 슬롯이 있으면 사용
     if time_window:
         days = time_window.get("days")
         weeks = time_window.get("weeks")
         months = time_window.get("months")
 
         if days:
-            start_date = today - timedelta(days=days)
+            if days == 1:
+                # "지난 1일" 또는 "어제" → 어제만
+                target_date = today - timedelta(days=1)
+                start_date = target_date
+                end_date = target_date
+            else:
+                # "지난 7일" → 7일 전부터 오늘까지
+                start_date = today - timedelta(days=days - 1)  # -1 수정: 오늘 포함
+                end_date = today
         elif weeks:
-            start_date = today - timedelta(weeks=weeks)
+            # "이번주" → 7일 전부터 오늘까지
+            start_date = today - timedelta(days=weeks * 7 - 1)
+            end_date = today
         elif months:
-            # 대략 30일로 계산 (정확한 월 계산은 복잡)
-            start_date = today - timedelta(days=months * 30)
+            # "이번달" → 30일 전부터 오늘까지
+            start_date = today - timedelta(days=months * 30 - 1)
+            end_date = today
+        else:
+            # time_window 있지만 값 없음 → 오늘만
+            start_date = today
+            end_date = today
+
+    # 2. 질문 텍스트에서 특정 날짜 키워드 감지
+    elif "오늘" in question_lower or "금일" in question_lower or "today" in question_lower:
+        # "오늘" → 오늘만
+        start_date = today
+        end_date = today
+
+    elif "어제" in question_lower or "yesterday" in question_lower:
+        # "어제" → 어제만
+        yesterday = today - timedelta(days=1)
+        start_date = yesterday
+        end_date = yesterday
+
+    elif "그제" in question_lower or "이틀 전" in question_lower:
+        # "그제" → 그제만
+        day_before = today - timedelta(days=2)
+        start_date = day_before
+        end_date = day_before
+
+    # 3. 기본값: 시간 범위 없으면 오늘만 (변경: 이전에는 30일)
     else:
-        # 시간 범위 없으면 최근 30일 기본값
-        start_date = today - timedelta(days=30)
+        start_date = today
+        end_date = today
 
     # YYYYMMDD 형식으로 변환
     start_suffix = start_date.strftime("%Y%m%d")
@@ -227,7 +275,7 @@ def _determine_table_suffix(
     else:
         suffix_condition = f"_TABLE_SUFFIX = '{end_suffix}'"
 
-    logger.info(f"Table suffix determined: {start_suffix} to {end_suffix}, wildcard={use_wildcard}")
+    logger.info(f"Table suffix determined: {start_suffix} to {end_suffix}, wildcard={use_wildcard}, today={today.strftime('%Y%m%d')}")
 
     return {
         "use_wildcard": use_wildcard,
@@ -376,6 +424,10 @@ def _build_sql_generation_prompt(
     # 메트릭 정의 추출
     metrics_info = _format_metrics_for_prompt(semantic_model)
 
+    # 메트릭 및 차원 목록 생성 (메타 질문용)
+    metrics_list = _extract_metrics_list(semantic_model)
+    dimensions_list = _extract_dimensions_list(semantic_model)
+
     # 테이블 정보 포맷팅
     tables_info = _format_tables_for_prompt(required_tables, table_suffix_info)
 
@@ -394,6 +446,26 @@ def _build_sql_generation_prompt(
 - Grain: {plan.get('grain')}
 - Slots: {json.dumps(plan.get('slots', {}), ensure_ascii=False)}
 
+# 메타 질문 처리
+질문이 "사용 가능한 차원/메트릭 알려줘", "어떤 분석 가능해?" 같은 **메타 질문**이면:
+- 시맨틱 모델 정보를 자연어로 요약하는 SELECT 문 생성
+- SQL이 아닌 정보성 결과를 반환하도록 함
+- 예시:
+
+```sql
+SELECT
+  '사용 가능한 메트릭' AS category,
+  '{metrics_list}' AS available_items
+UNION ALL
+SELECT
+  '사용 가능한 차원' AS category,
+  '{dimensions_list}' AS available_items
+UNION ALL
+SELECT
+  '예시 질문' AS category,
+  '지난 7일 디바이스별 주문 추이, 국가별 매출 상위 10개' AS available_items
+```
+
 # 시맨틱 모델
 
 ## 엔티티 및 측정항목
@@ -401,6 +473,12 @@ def _build_sql_generation_prompt(
 
 ## 메트릭 정의
 {metrics_info}
+
+## 사용 가능한 메트릭 목록
+{metrics_list}
+
+## 사용 가능한 차원 목록
+{dimensions_list}
 
 # 테이블 정보
 {tables_info}
@@ -421,9 +499,27 @@ def _build_sql_generation_prompt(
    - device_category → device.category
    - traffic_medium → traffic_source.medium
    - geo_country → geo.country
-5. 시맨틱 모델의 메트릭 정의(expr)를 정확히 따를 것
-6. GROUP BY, ORDER BY는 grain에 맞게 생성
-7. LIMIT {limit if limit else '없음'}
+5. **event_name 필터 필수 (중요!)**: GA4는 모든 이벤트가 하나의 테이블에 저장됨
+   - "페이지 조회" → WHERE event_name = 'page_view'
+   - "구매" → WHERE event_name = 'purchase'
+   - "장바구니" → WHERE event_name = 'add_to_cart'
+   - "세션 시작" → WHERE event_name = 'session_start'
+   - "사용자 참여" → WHERE event_name = 'user_engagement'
+   - "환불" → WHERE event_name = 'refund'
+   - "상품조회" → WHERE event_name = 'view_item'
+   - "로그인" → WHERE event_name = 'login'
+   - "자동로그인" → WHERE event_name = 'auto_login'
+   - "회원가입" → WHERE event_name = 'sign_up'
+   - "클릭이벤트" → WHERE event_name = 'click'
+   - "세션시작" → WHERE event_name = 'session_start'
+   - "첫방문" → WHERE event_name = 'first_visit'
+   - "로그아웃" → WHERE event_name = 'logout'
+   - "장바구니제거" → WHERE event_name = 'remove_from_wishlist'
+   - 질문의 문맥에 맞는 event_name 필터를 반드시 추가할 것
+   - 예: "방문자별 페이지 오픈 수" → WHERE event_name = 'page_view'
+6. 시맨틱 모델의 메트릭 정의(expr)를 정확히 따를 것
+7. GROUP BY, ORDER BY는 grain에 맞게 생성
+8. LIMIT {limit if limit else '없음'}
 
 # 대화 컨텍스트
 {_format_context_for_prompt(context)}
@@ -528,6 +624,51 @@ def _format_context_for_prompt(context: Dict[str, Any]) -> str:
     return "\n".join(lines) if lines else "없음"
 
 
+def _extract_metrics_list(semantic_model: Dict[str, Any]) -> str:
+    """메트릭 목록을 간단한 문자열로 추출 (메타 질문용)"""
+    metrics = semantic_model.get("metrics", [])
+    metric_names = []
+
+    for metric in metrics:
+        if isinstance(metric, dict):
+            name = metric.get("name")
+            desc = metric.get("description", "")
+            if name:
+                if desc:
+                    metric_names.append(f"{name} ({desc})")
+                else:
+                    metric_names.append(name)
+
+    return ", ".join(metric_names) if metric_names else "orders, gmv, sessions, users, events"
+
+
+def _extract_dimensions_list(semantic_model: Dict[str, Any]) -> str:
+    """차원 목록을 간단한 문자열로 추출 (메타 질문용)"""
+    entities = semantic_model.get("entities", [])
+    dimension_names = []
+
+    for entity in entities:
+        if isinstance(entity, dict):
+            entity_name = entity.get("name", "")
+            dimensions = entity.get("dimensions", [])
+
+            for dim in dimensions[:3]:  # 각 엔티티에서 상위 3개만
+                if isinstance(dim, dict):
+                    dim_name = dim.get("name")
+                    if dim_name:
+                        dimension_names.append(f"{entity_name}.{dim_name}")
+
+    # GA4 common_dimensions도 추가
+    common_dims = semantic_model.get("common_dimensions", {})
+    if common_dims:
+        # 상위 5개만
+        for korean, field in list(common_dims.items())[:5]:
+            if field not in dimension_names:
+                dimension_names.append(f"{korean} ({field})")
+
+    return ", ".join(dimension_names) if dimension_names else "event_date, device.category, geo.country, traffic_source.medium"
+
+
 def _format_ga4_schema_for_prompt(semantic_model: Dict[str, Any]) -> str:
     """GA4 스키마 정보를 프롬프트용으로 포맷팅"""
     ga4_schema = semantic_model.get("ga4_schema", {})
@@ -570,12 +711,38 @@ def _format_ga4_schema_for_prompt(semantic_model: Dict[str, Any]) -> str:
         lines.append("- traffic_source.medium: organic, cpc, referral")
         lines.append("")
 
+    # REPEATED 필드 (event_params, items)
+    lines.append("### REPEATED 필드 (UNNEST 필요)")
+    lines.append("")
+    lines.append("**event_params** (페이지, 세션 정보 등):")
+    lines.append("```sql")
+    lines.append("-- 페이지 URL: (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location') AS page_url")
+    lines.append("-- 페이지 경로: (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_path') AS page_path")
+    lines.append("-- 페이지 제목: (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_title') AS page_title")
+    lines.append("-- 세션 ID: (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS session_id")
+    lines.append("```")
+    lines.append("")
+
+    lines.append("**items** (E-commerce 상품):")
+    lines.append("```sql")
+    lines.append("-- FROM table, UNNEST(items) AS item")
+    lines.append("-- item.item_id, item.item_name, item.price, item.quantity")
+    lines.append("```")
+    lines.append("")
+
     # 주의사항
     notes = semantic_model.get("notes", [])
     if notes:
-        lines.append("### 주의사항")
-        for note in notes[:3]:  # 상위 3개만
+        lines.append("### 중요 주의사항")
+        for note in notes:
             lines.append(f"- {note}")
+        lines.append("")
+
+    # 추가 주의사항
+    lines.append("**event_params 필드 사용법:**")
+    lines.append("- page, page_url, page_path, page_title은 event_params에서 UNNEST로 추출")
+    lines.append("- 직접 e.page 사용 금지 (GA4에는 최상위 page 필드 없음)")
+    lines.append("- 세션 ID도 event_params에서 추출")
 
     return "\n".join(lines)
 
@@ -621,8 +788,9 @@ def _call_openai_for_sql(prompt: str) -> str:
         model = settings.openai_model or "gpt-4o-mini"
         token_param = {}
 
-        # gpt-4o, gpt-4o-mini 등 최신 모델은 max_completion_tokens 사용
-        if "gpt-4o" in model or "o1" in model or "o3" in model:
+        # 최신 모델은 max_completion_tokens 사용
+        # gpt-4o, gpt-5, o1, o3 시리즈
+        if any(x in model for x in ["gpt-4o", "gpt-5", "o1-", "o3-"]):
             token_param["max_completion_tokens"] = settings.llm_max_tokens or 2048
         else:
             # 이전 모델 (gpt-3.5, gpt-4 등)은 max_tokens 사용

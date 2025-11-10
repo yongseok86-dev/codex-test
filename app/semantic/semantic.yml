@@ -386,6 +386,13 @@ common_dimensions:
   유입경로: "traffic_source.source"
   캠페인: "traffic_source.name"
 
+  # event_params에서 추출 필요 (UNNEST 사용)
+  페이지: "(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_path')"
+  페이지별: "(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_path')"
+  페이지URL: "(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location')"
+  페이지제목: "(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_title')"
+  세션ID: "(SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id')"
+
   시간대: "EXTRACT(HOUR FROM TIMESTAMP_MICROS(event_timestamp))"
   날짜: "DATE(TIMESTAMP_MICROS(event_timestamp))"
   일자: "DATE(TIMESTAMP_MICROS(event_timestamp))"
