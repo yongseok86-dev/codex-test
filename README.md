@@ -831,7 +831,7 @@ sequenceDiagram
     participant NLU as nlu.py<br/>extract()
     participant PL as planner.py<br/>make_plan()
     participant SG as sqlgen.py<br/>generate()
-    participant LINK as linking.py<br/>schema_link()
+    participant LINKING as linking.py<br/>schema_link()
     participant GRD as guard.py<br/>parse_sql()
     participant VAL as validator.py<br/>ensure_safe()
     participant PIPE as validation.py<br/>run_pipeline()
@@ -888,15 +888,15 @@ sequenceDiagram
     API-->>ChatView: event: sql
 
     Note over API: 6. 스키마 링킹 (하이브리드)
-    API->>LINK: match schema elements
-    LINK->>LINK: token based matching<br/>토큰 + 별칭 + 동의어 매칭
+    API->>LINKING: match schema elements
+    LINKING->>LINKING: token based matching<br/>토큰 + 별칭 + 동의어 매칭
 
     alt confidence < 0.6
-        LINK->>LLM: llm based matching<br/>"스키마 요소 매칭"
-        LLM-->>LINK: {candidates, confidence} JSON
+        LINKING->>LLM: llm based matching<br/>"스키마 요소 매칭"
+        LLM-->>LINKING: {candidates, confidence} JSON
     end
 
-    LINK-->>API: {candidates, confidence, method}
+    LINKING-->>API: {candidates, confidence, method}
     API-->>ChatView: event: linking
 
     Note over API: 7. 가드레일 검사
