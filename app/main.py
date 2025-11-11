@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from time import perf_counter
 
-from app.routers import health, query, network
+from app.routers import health, query, network, time_series
 from app.deps import setup_logging, get_logger
 
 
@@ -14,6 +14,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(query.router)
     app.include_router(network.router)
+    app.include_router(time_series.router)
 
     @app.middleware("http")
     async def access_log(request: Request, call_next):  # type: ignore[override]

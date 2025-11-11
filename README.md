@@ -167,6 +167,65 @@ f:\codex\codex1\
 └── README.md                     # 이 파일
 ```
 
+```json
+{
+  "segment": {"id": "repeat_buyers", "label": "반복 구매 고객"},
+  "nodes": [{"id": "product_detail", "label": "Product detail", "value": 620}],
+  "links": [{"source": "product_detail", "target": "add_to_cart", "value": 310}],
+  "summary": {"total_transitions": 1240, "edge_count": 5, "node_count": 6},
+  "filters": {"start_date": "2025-10-15", "end_date": "2025-10-28", "limit": 25, "min_edge_count": 3}
+}
+```
+
+### 🧾 시간별 구매량 API (NEW)
+
+```http
+GET /api/time-series/purchases?product_id=SKU123&start_date=2025-10-01&end_date=2025-10-31&grain=day
+```
+
+```json
+{
+  "series": [
+    {"bucket": "2025-10-01", "total_quantity": 42},
+    {"bucket": "2025-10-02", "total_quantity": 37},
+    ...
+  ],
+  "filters": {
+    "product_id": "SKU123",
+    "start_date": "2025-10-01",
+    "end_date": "2025-10-31",
+    "grain": "day"
+  }
+}
+```
+
+파라미터:
+- `product_id` (선택): 특정 상품 필터
+- `start_date`, `end_date`: YYYY-MM-DD
+- `grain`: day | week | month
+
+### 🔵 시간대별 상품 버블 차트 API
+
+```http
+GET /api/time-series/purchases/bubbles
+```
+
+```json
+{
+  "series": [
+    {"time_bucket": "10:00", "product_name": "티셔츠", "total_quantity": 42},
+    {"time_bucket": "11:15", "product_name": "신발", "total_quantity": 18}
+  ],
+  "filters": {
+    "date": "2025-11-10"
+  }
+}
+```
+
+설명:
+- 파라미터 없이 현재 날짜 데이터를 기준으로 시간(HH:MM)·상품명·구매 수량을 제공합니다.
+- 프런트에서는 버블 차트(X축 시간, Y축 수량, 버블/색상으로 상품 구분)를 렌더링할 수 있습니다.
+
 ---
 
 ## 🚀 빠른 시작

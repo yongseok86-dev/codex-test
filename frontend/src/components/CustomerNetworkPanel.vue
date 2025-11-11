@@ -60,31 +60,34 @@
               :links="graph?.links || []"
             />
           </div>
-          <div class="summary-card">
-            <h3>{{ graph?.segment.label }}</h3>
-            <p class="muted">{{ graph?.segment.description }}</p>
-            <div class="summary-grid">
-              <div>
-                <span>기간</span>
-                <strong>{{ graph?.filters.start_date }} ~ {{ graph?.filters.end_date }}</strong>
+          <div class="insight-grid">
+            <div class="summary-card">
+              <h3>{{ graph?.segment.label }}</h3>
+              <p class="muted">{{ graph?.segment.description }}</p>
+              <div class="summary-grid">
+                <div>
+                  <span>기간</span>
+                  <strong>{{ graph?.filters.start_date }} ~ {{ graph?.filters.end_date }}</strong>
+                </div>
+                <div>
+                  <span>총 전환 수</span>
+                  <strong>{{ graph?.summary.total_transitions }}</strong>
+                </div>
+                <div>
+                  <span>노드 수</span>
+                  <strong>{{ graph?.summary.node_count }}</strong>
+                </div>
+                <div>
+                  <span>연결 수</span>
+                  <strong>{{ graph?.summary.edge_count }}</strong>
+                </div>
               </div>
-              <div>
-                <span>총 전환 수</span>
-                <strong>{{ graph?.summary.total_transitions }}</strong>
-              </div>
-              <div>
-                <span>노드 수</span>
-                <strong>{{ graph?.summary.node_count }}</strong>
-              </div>
-              <div>
-                <span>연결 수</span>
-                <strong>{{ graph?.summary.edge_count }}</strong>
+              <div class="source">
+                <span>데이터 소스</span>
+                <code>{{ graph?.data_source.events_table }}</code>
               </div>
             </div>
-            <div class="source">
-              <span>데이터 소스</span>
-              <code>{{ graph?.data_source.events_table }}</code>
-            </div>
+            <ProductTimeSeries class="timeseries-card" />
           </div>
         </div>
         <el-empty v-else description="조건에 맞는 데이터가 없습니다." />
@@ -97,6 +100,7 @@
 import { onMounted, ref, computed } from 'vue'
 import NetworkGraph from './NetworkGraph.vue'
 import SankeyChart from './SankeyChart.vue'
+import ProductTimeSeries from './ProductTimeSeries.vue'
 
 interface SegmentOption {
   id: string
@@ -267,6 +271,11 @@ onMounted(() => {
   min-height: 100%;
   height: 100%;
 }
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+}
 .summary-card {
   flex: 0 0 auto;
   border: 1px solid rgba(148, 163, 184, 0.3);
@@ -275,6 +284,9 @@ onMounted(() => {
   background: rgba(15, 23, 42, 0.6);
   backdrop-filter: blur(6px);
   color: #f8fafc;
+}
+.timeseries-card {
+  min-height: 320px;
 }
 .muted {
   color: #cbd5f5;

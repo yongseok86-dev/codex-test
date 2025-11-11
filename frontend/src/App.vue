@@ -28,6 +28,9 @@
       <section v-if="activeView === 'network'" class="insight-panel">
         <CustomerNetworkPanel />
       </section>
+      <section v-else-if="activeView === 'timeseries'" class="insight-panel">
+        <TimeSeriesView />
+      </section>
       <section v-else class="chat-shell">
         <ChatView />
       </section>
@@ -40,6 +43,7 @@
 import { ref, watch, computed } from 'vue'
 import ChatView from './views/ChatView.vue'
 import CustomerNetworkPanel from './components/CustomerNetworkPanel.vue'
+import TimeSeriesView from './views/TimeSeriesView.vue'
 import { useChatStore } from './store/chat'
 
 const { conversations, newConversation, selectConversation } = useChatStore()
@@ -48,7 +52,8 @@ const preferredDark = typeof window !== 'undefined' && localStorage.getItem('the
 const isDark = ref<boolean>(preferredDark)
 const views = [
   { id: 'chat', label: '챗 보기' },
-  { id: 'network', label: '고객 네트워크' }
+  { id: 'network', label: '고객 네트워크' },
+  { id: 'timeseries', label: '구매 트렌드' }
 ] as const
 const activeView = ref<(typeof views)[number]['id']>('chat')
 
@@ -72,10 +77,7 @@ watch(isDark, (v) => {
 .history-item:hover { background: #f5f7fa; }
 .content { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: auto; }
 .chat-shell { flex: 1 1 auto; min-height: 0; }
-.insight-panel {
-  flex: 1 1 auto;
-  min-height: 0;
-}
+.insight-panel { flex: 1 1 auto; min-height: 0; }
 .footer { border-top: 1px solid #e5e7eb; padding: 8px 12px; color: #6b7280; font-size: 12px; }
 </style>
 
